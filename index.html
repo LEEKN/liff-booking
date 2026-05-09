@@ -93,24 +93,21 @@
   </div>
 
   <script>
-    // ==============================
-    // 請修改以下兩個設定值
-    // ==============================
-    const LIFF_ID = "2010006924-yy3gmsF5";           // 替換成你的 LIFF ID
-    const CAL_URL = "https://cal.com/tomisacat-eur7wq"; // 替換成你的 Cal.com 預約網址
-    // ==============================
+const LIFF_ID = "2010006924-yy3gmsF5";
+    const CAL_URL = "https://cal.com/tomisacat-eur7wq";
 
     const statusEl = document.getElementById("status-text");
     const loadingCard = document.getElementById("loading-card");
     const errorCard = document.getElementById("error-card");
     const fallbackLink = document.getElementById("fallback-link");
+    const errorMsg = document.getElementById("error-msg");
 
     fallbackLink.href = CAL_URL;
 
     function showError(msg) {
       loadingCard.style.display = "none";
       errorCard.style.display = "block";
-      document.getElementById("error-msg").textContent = msg || "請關閉此頁面後重試。";
+      errorMsg.textContent = msg;
     }
 
     async function init() {
@@ -119,7 +116,7 @@
         await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
-          statusEl.textContent = "請稍候，正在登入…";
+          statusEl.textContent = "正在登入…";
           liff.login();
           return;
         }
@@ -129,20 +126,11 @@
         const userId = profile.userId;
 
         statusEl.textContent = "跳轉至預約頁面…";
-
-        // 把 User ID 帶到 Cal.com 的 URL 參數中（填入隱藏欄位用）
-        const redirectUrl = `${CAL_URL}?lineUserId=${encodeURIComponent(userId)}`;
-
-        // 在 LIFF 瀏覽器中跳轉
-        if (liff.isInClient()) {
-          liff.openWindow({ url: redirectUrl, external: false });
-        } else {
-          window.location.href = redirectUrl;
-        }
+        const redirectUrl = CAL_URL + "?lineUserId=" + encodeURIComponent(userId);
+        window.location.href = redirectUrl;
 
       } catch (err) {
-        console.error(err);
-        showError("載入時發生錯誤，請直接點選下方連結前往預約。");
+        showError("錯誤代碼：" + (err.code || "unknown") + " / " + (err.message || JSON.stringify(err)));
       }
     }
 
