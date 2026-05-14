@@ -6,38 +6,179 @@
   <title>預約系統</title>
   <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
   <style>
-    body { font-family: sans-serif; display: flex; justify-content: center;
-           align-items: center; min-height: 100vh; background: #f0f4f8; }
-    .card { background: white; padding: 40px; border-radius: 16px;
-            text-align: center; max-width: 320px; }
-    .spinner { width: 40px; height: 40px; margin: 16px auto;
-               border: 3px solid #eee; border-top-color: #06C755;
-               border-radius: 50%; animation: spin 0.8s linear infinite; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: sans-serif; background: #f0f4f8; }
+
+    #loading {
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: white; padding: 40px; border-radius: 16px;
+      text-align: center; max-width: 320px;
+    }
+    .spinner {
+      width: 40px; height: 40px; margin: 16px auto;
+      border: 3px solid #eee; border-top-color: #06C755;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    #cal-embed {
+      display: none;
+      width: 100%; height: 100vh;
+    }
+    #cal-embed iframe {
+      width: 100%; height: 100%; border: none;
+    }
+
+    /* ── 自訂成功畫面 ── */
+    #success-screen {
+      display: none;
+      justify-content: center; align-items: center;
+      min-height: 100vh;
+      background: #f0f4f8;
+    }
+    .success-card {
+      background: white; padding: 48px 32px; border-radius: 20px;
+      text-align: center; max-width: 340px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .success-icon {
+      width: 64px; height: 64px; margin: 0 auto 20px;
+      background: #06C755; border-radius: 50%;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .success-icon svg { width: 32px; height: 32px; }
+    .success-card h2 {
+      font-size: 22px; color: #1a1a1a; margin-bottom: 12px;
+    }
+    .success-card p {
+      font-size: 15px; color: #666; line-height: 1.6; margin-bottom: 24px;
+    }
+    .close-btn {
+      display: inline-block; padding: 14px 48px;
+      background: #06C755; color: white; border: none;
+      border-radius: 12px; font-size: 16px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+    }
+    .close-btn:active { background: #05b34c; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>正在載入預約頁面…</h2>
-    <div class="spinner"></div>
+
+  <!-- 載入中 -->
+  <div id="loading">
+    <div class="card">
+      <h2>正在載入預約頁面…</h2>
+      <div class="spinner"></div>
+    </div>
   </div>
+
+  <!-- Cal.com iframe -->
+  <div id="cal-embed"></div>
+
+  <!-- 自訂預約成功畫面 -->
+  <div id="success-screen">
+    <div class="success-card">
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"
+             stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2>預約成功 🎉</h2>
+      <p>
+        感謝您的預約！<br>
+        我們已收到您的資訊，<br>
+        届時期待為您服務 💆
+      </p>
+      <button class="close-btn" onclick="closeWindow()">返回 LINE</button>
+    </div>
+  </div>
+
   <script>
-    const LIFF_ID  = "2010006924-yy3gmsF5";
-    const CAL_URL  = "https://cal.com/tomisacat-eur7wq";
+    const LIFF_ID      = "2010006924-yy3gmsF5";
+    const CAL_USERNAME = "tomisacat-eur7wq";
 
     async function init() {
       try {
         await liff.init({ liffId: LIFF_ID });
         if (!liff.isLoggedIn()) { liff.login(); return; }
-        const profile = await liff.getProfile();
-        const url = `${CAL_URL}?lineUserId=${encodeURIComponent(profile.userId)}`;
 
-        // ✅ 改用 replace，Cal.com 成為 WebView 的 History 起點
-        window.location.replace(url);
+        const profile = await liff.getProfile();
+        const userId  = encodeURIComponent(profile.userId);
+
+        // 建立 iframe
+        const iframe = document.createElement("iframe");
+        iframe.src = `https://cal.com/${CAL_USERNAME}?lineUserId=${userId}&embed=true`;
+        iframe.allow = "payment";
+
+        document.getElementById("loading").style.display = "none";
+        const container = document.getElementById("cal-embed");
+        container.style.display = "block";
+        container.appendChild(iframe);
+
+        // 監聽 Cal.com 的 postMessage 事件
+        window.addEventListener("message", function (e) {
+          // Cal.com embed 會發送多種事件
+          // 預約完成時的事件格式可能是：
+          // { data: { type: "CAL:bookingSuccessful", ... } }
+          // 或 URL 變化包含 "booking" 關鍵字
+          if (e.data && typeof e.data === "object") {
+            const type = e.data.type || "";
+            if (type === "CAL:bookingSuccessful" ||
+                type === "__routeChanged" && 
+                JSON.stringify(e.data).includes("booking")) {
+              showSuccess();
+            }
+          }
+          // 也監聽字串格式的事件
+          if (typeof e.data === "string" && 
+              e.data.includes("bookingSuccessful")) {
+            showSuccess();
+          }
+        });
+
+        // 備用方案：監聽 iframe URL 變化（標題變化）
+        const checkTitle = setInterval(() => {
+          try {
+            const title = iframe.contentDocument?.title || "";
+            if (title.includes("預約已確認") || title.includes("Booking Confirmed")) {
+              showSuccess();
+              clearInterval(checkTitle);
+            }
+          } catch (ignored) {
+            // 跨域無法讀取，正常情況，靠 postMessage
+          }
+        }, 1000);
+
       } catch (err) {
-        document.body.innerHTML = "<div class='card'>載入失敗，請重試</div>";
+        document.getElementById("loading").innerHTML =
+          "<div class='card'>載入失敗，請重試</div>";
       }
     }
+
+    function showSuccess() {
+      document.getElementById("cal-embed").style.display = "none";
+      const screen = document.getElementById("success-screen");
+      screen.style.display = "flex";
+
+      // 防止返回鍵回到 iframe
+      history.pushState(null, "", location.href);
+      window.addEventListener("popstate", function () {
+        closeWindow();
+      });
+    }
+
+    function closeWindow() {
+      if (liff.isInClient()) {
+        liff.closeWindow();
+      } else {
+        window.close();
+      }
+    }
+
     init();
   </script>
 </body>
