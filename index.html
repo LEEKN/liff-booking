@@ -3,362 +3,1249 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>預約系統</title>
+  <title>線上預約</title>
   <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    /* ── Reset & 根變數 ── */
+    *, *::before, *::after {
+      margin: 0; padding: 0; box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --matcha:      #6b8f5e;   /* 主色：抹茶綠 */
+      --matcha-dark: #4f6b44;   /* 深抹茶（按鈕 hover） */
+      --matcha-mid:  #8aab7a;   /* 中抹茶（選取框線） */
+      --matcha-pale: #d4e5cc;   /* 淺抹茶（選取背景） */
+      --matcha-bg:   #eef4ea;   /* 超淺（頁面背景） */
+      --milk:        #faf9f5;   /* 牛奶白（卡片背景） */
+      --milk-deep:   #f0ede5;   /* 深牛奶（分隔區塊） */
+      --ink:         #1e1e1e;   /* 主文字 */
+      --ink-mid:     #555;      /* 次文字 */
+      --ink-light:   #999;      /* 提示文字 */
+      --border:      #ddd8ce;   /* 常規框線 */
+      --radius-sm:   8px;
+      --radius-md:   14px;
+      --radius-lg:   20px;
+      --shadow-sm:   0 2px 8px rgba(0,0,0,0.07);
+      --shadow-md:   0 4px 20px rgba(0,0,0,0.1);
+    }
 
     body {
       font-family: 'Noto Sans TC', -apple-system, sans-serif;
-      background: #f5f5f0;
-      color: #1a1a1a;
+      background: var(--matcha-bg);
+      color: var(--ink);
       min-height: 100vh;
       min-height: 100dvh;
+      font-size: 15px;
+      line-height: 1.6;
     }
 
-    /* ── 載入畫面 ── */
-    #loading {
+    /* ══════════════════════════════════════
+       載入畫面
+    ══════════════════════════════════════ */
+    #screen-loading {
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      gap: 20px;
     }
-    .loading-card {
-      background: white;
-      padding: 40px;
-      border-radius: 16px;
-      text-align: center;
-      max-width: 300px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    .loading-logo {
+      width: 60px; height: 60px;
+      background: var(--matcha);
+      border-radius: 18px;
+      display: flex; justify-content: center; align-items: center;
     }
-    .loading-card h2 {
-      font-size: 17px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 16px;
+    .loading-logo svg { width: 34px; height: 34px; }
+    .loading-label {
+      font-size: 15px;
+      color: var(--ink-mid);
+      font-weight: 500;
     }
     .spinner {
-      width: 36px; height: 36px; margin: 0 auto;
-      border: 3px solid #eee; border-top-color: #06C755;
-      border-radius: 50%; animation: spin 0.8s linear infinite;
+      width: 32px; height: 32px;
+      border: 3px solid var(--matcha-pale);
+      border-top-color: var(--matcha);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Cal.com embed 容器 ── */
-    #cal-container {
+    /* ══════════════════════════════════════
+       主預約流程畫面
+    ══════════════════════════════════════ */
+    #screen-booking {
       display: none;
-      width: 100%;
+      flex-direction: column;
       min-height: 100vh;
-      overflow: auto;
     }
 
-    /* ── 自訂預約成功畫面 ── */
-    #success-screen {
+    /* ── 頂部 Header ── */
+    .app-header {
+      background: var(--milk);
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .app-header-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-logo {
+      width: 36px; height: 36px;
+      background: var(--matcha);
+      border-radius: 10px;
+      display: flex; justify-content: center; align-items: center;
+      flex-shrink: 0;
+    }
+    .header-logo svg { width: 20px; height: 20px; }
+    .header-text h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+    .header-text p {
+      font-size: 12px;
+      color: var(--ink-light);
+      margin-top: 2px;
+    }
+
+    /* ── 步驟指示器 ── */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px 0;
+      gap: 0;
+    }
+    .step-dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; justify-content: center; align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--milk-deep);
+      color: var(--ink-light);
+      border: 2px solid var(--border);
+      transition: all 0.25s;
+      flex-shrink: 0;
+    }
+    .step-dot.active {
+      background: var(--matcha);
+      color: white;
+      border-color: var(--matcha);
+    }
+    .step-dot.done {
+      background: var(--matcha-pale);
+      color: var(--matcha-dark);
+      border-color: var(--matcha-mid);
+    }
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      transition: background 0.25s;
+    }
+    .step-line.done { background: var(--matcha-mid); }
+    .step-labels {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 20px 16px;
+    }
+    .step-label {
+      font-size: 11px;
+      color: var(--ink-light);
+      flex: 1;
+      text-align: center;
+    }
+    .step-label:first-child { text-align: left; }
+    .step-label:last-child { text-align: right; }
+    .step-label.active { color: var(--matcha); font-weight: 600; }
+
+    /* ── 內容區 ── */
+    .booking-content {
+      flex: 1;
+      padding: 0 16px 32px;
+      overflow-y: auto;
+    }
+
+    /* ── 區塊卡片 ── */
+    .section-card {
+      background: var(--milk);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-mid);
+      letter-spacing: 0.5px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      background: var(--milk-deep);
+      text-transform: uppercase;
+    }
+
+    /* ══ 步驟一：方案選擇 ══ */
+    #step-1 { display: block; }
+    #step-2 { display: none; }
+    #step-3 { display: none; }
+
+    .plan-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .plan-item {
+      border: 2px solid transparent;
+      border-radius: var(--radius-sm);
+      background: var(--matcha-bg);
+      padding: 14px 14px 12px;
+      cursor: pointer;
+      transition: all 0.18s;
+      position: relative;
+    }
+    .plan-item:active { transform: scale(0.98); }
+    .plan-item.selected {
+      border-color: var(--matcha);
+      background: var(--matcha-pale);
+    }
+    .plan-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 4px;
+    }
+    .plan-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .plan-duration {
+      font-size: 12px;
+      background: var(--milk);
+      color: var(--matcha-dark);
+      border: 1px solid var(--matcha-pale);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .plan-desc {
+      font-size: 13px;
+      color: var(--ink-mid);
+      line-height: 1.5;
+    }
+    .plan-check {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--matcha);
       display: none;
       justify-content: center;
       align-items: center;
+    }
+    .plan-item.selected .plan-check { display: flex; }
+    .plan-item.selected .plan-duration { display: none; }
+    .plan-check svg { width: 12px; height: 12px; }
+
+    /* ══ 步驟二：日期與時段 ══ */
+    .calendar-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+    }
+    .cal-nav-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--milk);
+      cursor: pointer;
+      display: flex; justify-content: center; align-items: center;
+      color: var(--ink-mid);
+      font-size: 18px;
+      transition: all 0.15s;
+    }
+    .cal-nav-btn:active { background: var(--matcha-pale); border-color: var(--matcha-mid); }
+    .cal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .cal-month-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      padding: 0 10px;
+      margin-bottom: 4px;
+    }
+    .cal-weekday {
+      text-align: center;
+      font-size: 11px;
+      color: var(--ink-light);
+      font-weight: 600;
+      padding: 4px 0;
+    }
+    .cal-weekday.sun { color: #d04040; }
+    .cal-weekday.sat { color: #4060c0; }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      padding: 0 10px 10px;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      border-radius: var(--radius-sm);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 2px solid transparent;
+      color: var(--ink);
+      position: relative;
+    }
+    .cal-day.empty { cursor: default; }
+    .cal-day.past {
+      color: var(--ink-light);
+      cursor: default;
+      pointer-events: none;
+    }
+    .cal-day.no-slot {
+      color: var(--ink-light);
+      cursor: default;
+      pointer-events: none;
+    }
+    .cal-day.has-slot {
+      background: var(--matcha-bg);
+      cursor: pointer;
+    }
+    .cal-day.has-slot:active { transform: scale(0.92); }
+    .cal-day.selected {
+      background: var(--matcha);
+      color: white;
+      border-color: var(--matcha-dark);
+    }
+    .cal-day.today:not(.selected)::after {
+      content: '';
+      position: absolute;
+      bottom: 3px; left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--matcha);
+    }
+    .cal-loading {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 20px;
+      color: var(--ink-light);
+      font-size: 13px;
+    }
+    .cal-sunday { color: #d04040; }
+    .cal-saturday { color: #4060c0; }
+
+    /* 時段列表 */
+    .slot-section {
+      border-top: 1px solid var(--border);
+      padding: 14px;
+    }
+    .slot-section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-mid);
+      margin-bottom: 10px;
+    }
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .slot-btn {
+      padding: 10px 6px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--milk);
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .slot-btn:active { transform: scale(0.95); }
+    .slot-btn.selected {
+      border-color: var(--matcha);
+      background: var(--matcha);
+      color: white;
+    }
+    .slot-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: var(--ink-light);
+      font-size: 13px;
+      padding: 16px 0;
+    }
+
+    /* ══ 步驟三：填寫資料 ══ */
+    .form-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .form-row { display: flex; flex-direction: column; gap: 6px; }
+    .form-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-mid);
+    }
+    .form-label span { color: #d04040; margin-left: 2px; }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--matcha-bg);
+      font-family: inherit;
+      font-size: 15px;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .form-input:focus { border-color: var(--matcha); background: white; }
+    .form-input::placeholder { color: var(--ink-light); }
+    .form-hint {
+      font-size: 12px;
+      color: var(--ink-light);
+    }
+
+    /* 預約摘要 */
+    .booking-summary {
+      background: var(--matcha-pale);
+      border: 1.5px solid var(--matcha-mid);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      margin: 0 16px 16px;
+    }
+    .summary-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--matcha-dark);
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .summary-row {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--matcha-dark);
+      margin-bottom: 4px;
+    }
+    .summary-row:last-child { margin-bottom: 0; }
+    .summary-icon { flex-shrink: 0; width: 16px; text-align: center; }
+
+    /* ── 底部按鈕區 ── */
+    .btn-area {
+      padding: 14px 16px;
+      background: var(--milk);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+    .btn-back {
+      flex: 0 0 auto;
+      padding: 14px 20px;
+      background: var(--milk);
+      color: var(--ink-mid);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-back:active { background: var(--milk-deep); }
+    .btn-next {
+      flex: 1;
+      padding: 14px;
+      background: var(--matcha);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-next:active { background: var(--matcha-dark); }
+    .btn-next:disabled {
+      background: var(--matcha-pale);
+      color: var(--matcha-mid);
+      cursor: default;
+    }
+    .btn-next .btn-spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn-next.loading .btn-spinner { display: block; }
+    .btn-next.loading .btn-text { display: none; }
+
+    /* ══════════════════════════════════════
+       預約成功畫面
+    ══════════════════════════════════════ */
+    #screen-success {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       min-height: 100vh;
-      background: #f5f5f0;
-      padding: 24px;
+      padding: 32px 20px;
+      background: var(--matcha-bg);
     }
     .success-card {
-      background: white;
-      padding: 48px 28px 36px;
-      border-radius: 20px;
-      text-align: center;
-      max-width: 340px;
+      background: var(--milk);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 40px 24px 32px;
       width: 100%;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      max-width: 360px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
     }
-    .success-icon {
-      width: 68px; height: 68px;
+    .success-icon-wrap {
+      width: 72px; height: 72px;
       margin: 0 auto 24px;
-      background: #06C755;
+      background: var(--matcha);
       border-radius: 50%;
       display: flex;
       justify-content: center;
       align-items: center;
-      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     }
     @keyframes popIn {
       0% { transform: scale(0); opacity: 0; }
       100% { transform: scale(1); opacity: 1; }
     }
-    .success-icon svg { width: 32px; height: 32px; }
-    .success-card h2 {
+    .success-icon-wrap svg { width: 34px; height: 34px; }
+    .success-title {
       font-size: 22px;
       font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 12px;
+      color: var(--ink);
+      margin-bottom: 10px;
     }
-    .success-card p {
-      font-size: 15px;
-      color: #666;
-      line-height: 1.7;
-      margin-bottom: 28px;
-    }
-    .success-detail {
+    .success-msg {
       font-size: 14px;
-      color: #444;
-      background: #f8f8f5;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 28px;
-      text-align: left;
+      color: var(--ink-mid);
       line-height: 1.8;
+      margin-bottom: 24px;
     }
-    .close-btn {
-      display: inline-block;
-      padding: 14px 48px;
-      background: #06C755;
+    .success-detail-box {
+      background: var(--matcha-pale);
+      border: 1px solid var(--matcha-mid);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      text-align: left;
+      margin-bottom: 28px;
+    }
+    .success-detail-row {
+      display: flex;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--matcha-dark);
+      margin-bottom: 6px;
+      line-height: 1.5;
+    }
+    .success-detail-row:last-child { margin-bottom: 0; }
+    .success-detail-icon { flex-shrink: 0; }
+    .btn-close {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      background: var(--matcha);
       color: white;
       border: none;
-      border-radius: 12px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
       font-size: 16px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      text-decoration: none;
       transition: background 0.15s;
     }
-    .close-btn:active { background: #05a648; }
+    .btn-close:active { background: var(--matcha-dark); }
 
-    /* ── 錯誤畫面 ── */
-    #error-screen {
+    /* ══════════════════════════════════════
+       錯誤畫面
+    ══════════════════════════════════════ */
+    #screen-error {
       display: none;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       padding: 24px;
     }
     .error-card {
-      background: white;
-      padding: 40px 28px;
-      border-radius: 16px;
+      background: var(--milk);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      padding: 32px 24px;
       text-align: center;
-      max-width: 300px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+      max-width: 320px;
+      width: 100%;
     }
-    .error-card p {
+    .error-icon { font-size: 40px; margin-bottom: 16px; }
+    .error-msg {
       font-size: 15px;
-      color: #666;
+      color: var(--ink-mid);
       margin-bottom: 20px;
+      line-height: 1.6;
     }
-    .retry-btn {
+    .btn-retry {
       padding: 12px 36px;
-      background: #1a1a1a;
+      background: var(--ink);
       color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
       font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-  <!-- 載入中 -->
-  <div id="loading">
-    <div class="loading-card">
-      <h2>正在載入預約頁面…</h2>
-      <div class="spinner"></div>
-    </div>
+<!-- ══════════════════════════════════════
+     載入畫面
+══════════════════════════════════════ -->
+<div id="screen-loading">
+  <div class="loading-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>
   </div>
+  <div class="spinner"></div>
+  <span class="loading-label">正在載入…</span>
+</div>
 
-  <!-- Cal.com inline embed 渲染區 -->
-  <div id="cal-container">
-    <div id="my-cal-inline" style="width:100%;height:100%;overflow:scroll"></div>
-  </div>
+<!-- ══════════════════════════════════════
+     預約主流程畫面
+══════════════════════════════════════ -->
+<div id="screen-booking">
 
-  <!-- 自訂預約成功畫面 -->
-  <div id="success-screen">
-    <div class="success-card">
-      <div class="success-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"
-             stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
+  <!-- Header -->
+  <div class="app-header">
+    <div class="app-header-inner">
+      <div class="header-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
         </svg>
       </div>
-      <h2>預約成功 🎉</h2>
-      <div id="booking-detail" class="success-detail" style="display:none;"></div>
-      <p>
-        感謝您的預約！<br>
-        我們已收到您的資訊，<br>
-        届時期待為您服務 💆
-      </p>
-      <button class="close-btn" onclick="closeWindow()">返回 LINE</button>
+      <div class="header-text">
+        <h1>線上預約</h1>
+        <p>請依序完成預約步驟</p>
+      </div>
+    </div>
+
+    <!-- 步驟指示器 -->
+    <div class="step-indicator">
+      <div class="step-dot active" id="dot-1">1</div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step-dot" id="dot-2">2</div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step-dot" id="dot-3">3</div>
+    </div>
+    <div class="step-labels">
+      <span class="step-label active" id="label-1">選擇方案</span>
+      <span class="step-label" id="label-2">選擇時段</span>
+      <span class="step-label" id="label-3">填寫資料</span>
     </div>
   </div>
 
-  <!-- 錯誤畫面 -->
-  <div id="error-screen">
-    <div class="error-card">
-      <p>載入失敗，請重新嘗試</p>
-      <button class="retry-btn" onclick="location.reload()">重試</button>
+  <!-- 內容區 -->
+  <div class="booking-content">
+
+    <!-- ── 步驟一：選擇方案 ── -->
+    <div id="step-1">
+      <div style="height:16px"></div>
+      <div class="section-card">
+        <div class="section-title">請選擇服務方案</div>
+        <div class="plan-list" id="plan-list">
+          <div style="text-align:center;padding:32px;color:var(--ink-light);font-size:14px;">
+            <div class="spinner" style="margin:0 auto 12px"></div>
+            載入中…
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- ── 步驟二：選擇日期 & 時段 ── -->
+    <div id="step-2">
+      <div style="height:16px"></div>
+      <div class="section-card" style="margin-bottom:12px">
+        <div class="section-title">選擇日期</div>
+        <div class="calendar-nav">
+          <button class="cal-nav-btn" id="btn-prev-month" onclick="changeMonth(-1)">&#8249;</button>
+          <span class="cal-month-label" id="cal-month-label">—</span>
+          <button class="cal-nav-btn" id="btn-next-month" onclick="changeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-weekdays">
+          <div class="cal-weekday sun">日</div>
+          <div class="cal-weekday">一</div>
+          <div class="cal-weekday">二</div>
+          <div class="cal-weekday">三</div>
+          <div class="cal-weekday">四</div>
+          <div class="cal-weekday">五</div>
+          <div class="cal-weekday sat">六</div>
+        </div>
+        <div class="cal-grid" id="cal-grid">
+          <div class="cal-loading">載入中…</div>
+        </div>
+      </div>
+
+      <!-- 時段列表 -->
+      <div class="section-card" id="slot-card" style="display:none">
+        <div class="section-title" id="slot-date-label">可預約時段</div>
+        <div class="slot-section">
+          <div class="slot-grid" id="slot-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 步驟三：填寫資料 ── -->
+    <div id="step-3">
+      <div style="height:16px"></div>
+
+      <!-- 預約摘要 -->
+      <div class="booking-summary" id="booking-summary">
+        <div class="summary-label">預約摘要</div>
+        <div class="summary-row">
+          <span class="summary-icon">💆</span>
+          <span id="summary-plan">—</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-icon">📅</span>
+          <span id="summary-datetime">—</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-icon">⏱</span>
+          <span id="summary-duration">—</span>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">基本資料</div>
+        <div class="form-body">
+          <div class="form-row">
+            <label class="form-label">姓名<span>*</span></label>
+            <input class="form-input" type="text" id="input-name" placeholder="請輸入您的姓名" autocomplete="name">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Email<span>*</span></label>
+            <input class="form-input" type="email" id="input-email" placeholder="example@mail.com" autocomplete="email" inputmode="email">
+          </div>
+          <div class="form-row">
+            <label class="form-label">手機號碼</label>
+            <input class="form-input" type="tel" id="input-phone" placeholder="0912-345-678" autocomplete="tel" inputmode="tel">
+          </div>
+          <div class="form-row">
+            <label class="form-label">備注</label>
+            <input class="form-input" type="text" id="input-note" placeholder="有特殊需求或備注請填寫">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /booking-content -->
+
+  <!-- 底部按鈕 -->
+  <div class="btn-area">
+    <button class="btn-back" id="btn-back" onclick="goPrev()" style="display:none">上一步</button>
+    <button class="btn-next" id="btn-next" onclick="goNext()">
+      <span class="btn-text">選擇時段 →</span>
+      <div class="btn-spinner"></div>
+    </button>
   </div>
 
-  <!-- ========================================
-       Cal.com 官方 Embed Script（不是 iframe）
-       ======================================== -->
-  <script>
-    (function (C, A, L) {
-      let p = function (a, ar) { a.q.push(ar); };
-      let d = C.document;
-      C.Cal = C.Cal || function () {
-        let cal = C.Cal;
-        let ar = arguments;
-        if (!cal.loaded) {
-          cal.ns = {};
-          cal.q = cal.q || [];
-          d.head.appendChild(d.createElement("script")).src = A;
-          cal.loaded = true;
-        }
-        if (ar[0] === L) {
-          const api = function () { p(api, arguments); };
-          const namespace = ar[1];
-          api.q = api.q || [];
-          if (typeof namespace === "string") {
-            cal.ns[namespace] = cal.ns[namespace] || api;
-            p(cal.ns[namespace], ar);
-            p(cal, ["initNamespace", namespace]);
-          } else p(cal, ar);
-          return;
-        }
-        p(cal, ar);
-      };
-    })(window, "https://app.cal.com/embed/embed.js", "init");
-  </script>
+</div><!-- /screen-booking -->
 
-  <script>
-    // =====================================================
-    //  請修改以下兩個變數
-    // =====================================================
-    var LIFF_ID      = "2010006924-yy3gmsF5";
-    var CAL_USERNAME = "tomisacat-eur7wq";
-    // =====================================================
+<!-- ══════════════════════════════════════
+     預約成功畫面
+══════════════════════════════════════ -->
+<div id="screen-success">
+  <div class="success-card">
+    <div class="success-icon-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div class="success-title">預約成功 🎉</div>
+    <div class="success-msg">
+      感謝您的預約！<br>
+      我們已收到您的資訊，<br>
+      屆時期待為您服務 💆
+    </div>
+    <div class="success-detail-box" id="success-detail">
+      <div class="success-detail-row">
+        <span class="success-detail-icon">💆</span>
+        <span id="suc-plan">—</span>
+      </div>
+      <div class="success-detail-row">
+        <span class="success-detail-icon">📅</span>
+        <span id="suc-datetime">—</span>
+      </div>
+      <div class="success-detail-row">
+        <span class="success-detail-icon">⏱</span>
+        <span id="suc-duration">—</span>
+      </div>
+      <div class="success-detail-row">
+        <span class="success-detail-icon">👤</span>
+        <span id="suc-name">—</span>
+      </div>
+    </div>
+    <button class="btn-close" onclick="closeWindow()">返回 LINE</button>
+  </div>
+</div>
 
-    var bookingHandled = false;
+<!-- ══════════════════════════════════════
+     錯誤畫面
+══════════════════════════════════════ -->
+<div id="screen-error">
+  <div class="error-card">
+    <div class="error-icon">😔</div>
+    <div class="error-msg" id="error-msg">載入失敗，請重新嘗試</div>
+    <button class="btn-retry" onclick="location.reload()">重試</button>
+  </div>
+</div>
 
-    async function init() {
-      try {
-        // ── 1. LIFF 初始化 ──
-        await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
-        }
+<script>
+/* ======================================================
+   ★ 請修改以下設定
+   ====================================================== */
+var LIFF_ID    = "2010006924-yy3gmsF5";       // 第 9 節取得的 LIFF ID
+var API_BASE   = "";                   // 留空 = 使用相對路徑（部署在同一個 Vercel 專案）
+                                       // 若獨立部署，填入 Vercel Function URL，例如 https://xxx.vercel.app
+/* ====================================================== */
 
-        // ── 2. 取得 LINE User ID ──
-        var profile = await liff.getProfile();
-        var lineUserId = profile.userId;
+/* ── 狀態 ── */
+var state = {
+  step: 1,
+  lineUserId: "",
+  eventTypes: [],
+  selectedPlan: null,        // { id, slug, title, length, description }
+  calendarYear: 0,
+  calendarMonth: 0,          // 0-based
+  slotsCache: {},            // "YYYY-MM" → { "YYYY-MM-DD": ["HH:mm", ...] }
+  calendarDays: [],          // 渲染用
+  selectedDate: "",          // "YYYY-MM-DD"
+  selectedSlot: "",          // "HH:mm"
+  selectedSlotIso: ""        // ISO 完整時間字串
+};
 
-        // ── 3. 初始化 Cal.com embed ──
-        Cal("init", { origin: "https://cal.com" });
+var TODAY = new Date();
+TODAY.setHours(0,0,0,0);
 
-        // ── 4. 載入 inline embed（帶 lineUserId） ──
-        Cal("inline", {
-          elementOrSelector: "#my-cal-inline",
-          calLink: CAL_USERNAME + "?lineUserId=" + encodeURIComponent(lineUserId)
-        });
+/* ── API 呼叫 ── */
+async function apiGet(params) {
+  var qs = Object.entries(params).map(([k,v]) => k + "=" + encodeURIComponent(v)).join("&");
+  var r = await fetch((API_BASE || "") + "/api/cal?" + qs);
+  if (!r.ok) throw new Error("API error " + r.status);
+  return r.json();
+}
+async function apiPost(body) {
+  var r = await fetch((API_BASE || "") + "/api/cal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  var data = await r.json();
+  if (!r.ok) throw new Error(data.error || "API error " + r.status);
+  return data;
+}
 
-        // ── 5. embed UI 設定 ──
-        Cal("ui", {
-          hideEventTypeDetails: false,
-          layout: "month_view"
-        });
+/* ── 初始化 ── */
+async function init() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    var profile = await liff.getProfile();
+    state.lineUserId = profile.userId;
+    await loadEventTypes();
+    show("screen-booking");
+    hide("screen-loading");
+  } catch(err) {
+    console.error("Init error:", err);
+    document.getElementById("error-msg").textContent = "初始化失敗：" + err.message;
+    show("screen-error");
+    hide("screen-loading");
+  }
+}
 
-        // ── 6. 監聽預約成功（新版事件名） ──
-        Cal("on", {
-          action: "bookingSuccessfulV2",
-          callback: function (e) {
-            if (!bookingHandled) {
-              bookingHandled = true;
-              showSuccess(e.detail.data);
-            }
-          }
-        });
+/* ── 載入方案 ── */
+async function loadEventTypes() {
+  var data = await apiGet({ action: "eventTypes" });
+  state.eventTypes = data.eventTypes || [];
+  renderPlanList();
+}
 
-        // ── 7. 監聽預約成功（舊版事件名，相容用） ──
-        Cal("on", {
-          action: "bookingSuccessful",
-          callback: function (e) {
-            if (!bookingHandled) {
-              bookingHandled = true;
-              showSuccess(e.detail.data);
-            }
-          }
-        });
+/* ── 渲染方案列表 ── */
+function renderPlanList() {
+  var container = document.getElementById("plan-list");
+  if (!state.eventTypes.length) {
+    container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--ink-light);font-size:14px;">目前沒有可預約的方案</div>';
+    return;
+  }
+  container.innerHTML = state.eventTypes.map(function(et) {
+    return '<div class="plan-item" onclick="selectPlan(' + et.id + ')" id="plan-' + et.id + '">' +
+      '<div class="plan-item-header">' +
+        '<div class="plan-name">' + esc(et.title) + '</div>' +
+        '<div class="plan-duration">' + et.length + ' 分鐘</div>' +
+        '<div class="plan-check">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+        '</div>' +
+      '</div>' +
+      (et.description ? '<div class="plan-desc">' + esc(et.description) + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
 
-        // ── 8. 切換畫面 ──
-        document.getElementById("loading").style.display = "none";
-        document.getElementById("cal-container").style.display = "block";
+function selectPlan(id) {
+  state.selectedPlan = state.eventTypes.find(function(e) { return e.id === id; });
+  document.querySelectorAll('.plan-item').forEach(function(el) { el.classList.remove('selected'); });
+  document.getElementById('plan-' + id).classList.add('selected');
+  updateNextBtn();
+}
 
-      } catch (err) {
-        console.error("Init error:", err);
-        document.getElementById("loading").style.display = "none";
-        document.getElementById("error-screen").style.display = "flex";
-      }
+/* ── 步驟導航 ── */
+function goNext() {
+  if (state.step === 1) {
+    if (!state.selectedPlan) return;
+    goStep(2);
+    initCalendar();
+  } else if (state.step === 2) {
+    if (!state.selectedSlotIso) return;
+    goStep(3);
+    renderSummary();
+  } else if (state.step === 3) {
+    submitBooking();
+  }
+}
+
+function goPrev() {
+  if (state.step === 2) goStep(1);
+  else if (state.step === 3) goStep(2);
+}
+
+function goStep(n) {
+  hide("step-" + state.step);
+  state.step = n;
+  show("step-" + n);
+  updateStepUI();
+  updateNextBtn();
+  window.scrollTo(0, 0);
+}
+
+function updateStepUI() {
+  [1,2,3].forEach(function(i) {
+    var dot = document.getElementById("dot-" + i);
+    var label = document.getElementById("label-" + i);
+    dot.className = "step-dot" + (i === state.step ? " active" : i < state.step ? " done" : "");
+    label.className = "step-label" + (i === state.step ? " active" : "");
+  });
+  [1,2].forEach(function(i) {
+    document.getElementById("line-" + i).className = "step-line" + (i < state.step ? " done" : "");
+  });
+  var backBtn = document.getElementById("btn-back");
+  backBtn.style.display = state.step > 1 ? "block" : "none";
+}
+
+function updateNextBtn() {
+  var btn = document.getElementById("btn-next");
+  var textEl = btn.querySelector(".btn-text");
+  if (state.step === 1) {
+    textEl.textContent = "選擇時段 →";
+    btn.disabled = !state.selectedPlan;
+  } else if (state.step === 2) {
+    textEl.textContent = "填寫資料 →";
+    btn.disabled = !state.selectedSlotIso;
+  } else {
+    textEl.textContent = "確認預約";
+    btn.disabled = false;
+  }
+}
+
+/* ── 日曆 ── */
+function initCalendar() {
+  var now = new Date();
+  state.calendarYear = now.getFullYear();
+  state.calendarMonth = now.getMonth();
+  state.selectedDate = "";
+  state.selectedSlot = "";
+  state.selectedSlotIso = "";
+  hide("slot-card");
+  renderCalendar();
+  fetchMonthSlots(state.calendarYear, state.calendarMonth);
+}
+
+function changeMonth(delta) {
+  state.calendarMonth += delta;
+  if (state.calendarMonth < 0)  { state.calendarMonth = 11; state.calendarYear--; }
+  if (state.calendarMonth > 11) { state.calendarMonth = 0;  state.calendarYear++; }
+  state.selectedDate = "";
+  state.selectedSlot = "";
+  state.selectedSlotIso = "";
+  hide("slot-card");
+  renderCalendar();
+  fetchMonthSlots(state.calendarYear, state.calendarMonth);
+}
+
+function renderCalendar() {
+  var yr = state.calendarYear, mo = state.calendarMonth;
+  document.getElementById("cal-month-label").textContent =
+    yr + " 年 " + (mo + 1) + " 月";
+
+  // 前後月控制
+  var now = new Date(); now.setDate(1); now.setHours(0,0,0,0);
+  var thisYm = now.getFullYear() * 12 + now.getMonth();
+  var viewYm = yr * 12 + mo;
+  document.getElementById("btn-prev-month").disabled = (viewYm <= thisYm);
+
+  var firstDay = new Date(yr, mo, 1).getDay(); // 0=Sun
+  var daysInMonth = new Date(yr, mo + 1, 0).getDate();
+  var key = yr + "-" + pad2(mo + 1);
+  var slotsData = state.slotsCache[key] || null;
+
+  var grid = document.getElementById("cal-grid");
+  var cells = "";
+
+  // 補空格
+  for (var i = 0; i < firstDay; i++) {
+    cells += '<div class="cal-day empty"></div>';
+  }
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = yr + "-" + pad2(mo + 1) + "-" + pad2(d);
+    var dayOfWeek = new Date(yr, mo, d).getDay();
+    var dateObj = new Date(yr, mo, d);
+    dateObj.setHours(0,0,0,0);
+
+    var cls = "cal-day";
+    if (dayOfWeek === 0) cls += " cal-sunday";
+    if (dayOfWeek === 6) cls += " cal-saturday";
+
+    var isToday = (dateObj.getTime() === TODAY.getTime());
+    if (isToday) cls += " today";
+
+    if (dateObj < TODAY) {
+      cls += " past";
+      cells += '<div class="' + cls + '">' + d + '</div>';
+      continue;
     }
 
-    function showSuccess(data) {
-      // 隱藏 Cal.com
-      document.getElementById("cal-container").style.display = "none";
+    if (slotsData === null) {
+      // 還在載入，暫時顯示為可點
+      cls += " has-slot";
+    } else {
+      var hasSlot = slotsData[dateStr] && slotsData[dateStr].length > 0;
+      cls += hasSlot ? " has-slot" : " no-slot";
+    }
 
-      // 顯示預約詳情（如果事件有帶資料）
-      if (data) {
-        var detailEl = document.getElementById("booking-detail");
-        var lines = [];
+    if (state.selectedDate === dateStr) cls += " selected";
 
-        if (data.title) {
-          lines.push("📋 " + data.title);
-        }
-        if (data.startTime) {
-          try {
-            var d = new Date(data.startTime);
-            var formatted = d.getFullYear() + "-"
-              + String(d.getMonth() + 1).padStart(2, "0") + "-"
-              + String(d.getDate()).padStart(2, "0") + " "
-              + String(d.getHours()).padStart(2, "0") + ":"
-              + String(d.getMinutes()).padStart(2, "0");
-            lines.push("📅 " + formatted);
-          } catch (ignore) {}
-        }
-        if (data.endTime && data.startTime) {
-          try {
-            var start = new Date(data.startTime);
-            var end = new Date(data.endTime);
-            var mins = Math.round((end - start) / 60000);
-            lines.push("⏱ " + mins + " 分鐘");
-          } catch (ignore) {}
-        }
+    cells += '<div class="' + cls + '" onclick="selectDate(\'' + dateStr + '\')">' + d + '</div>';
+  }
 
-        if (lines.length > 0) {
-          detailEl.innerHTML = lines.join("<br>");
-          detailEl.style.display = "block";
-        }
-      }
+  grid.innerHTML = cells;
+}
 
-      // 顯示成功畫面
-      document.getElementById("success-screen").style.display = "flex";
+async function fetchMonthSlots(yr, mo) {
+  var key = yr + "-" + pad2(mo + 1);
+  if (state.slotsCache[key]) { renderCalendar(); return; }
 
-      // 按返回鍵 → 直接關閉回 LINE
-      history.pushState(null, "", location.href);
-      window.addEventListener("popstate", function () {
-        closeWindow();
+  // 設 loading 狀態
+  state.slotsCache[key] = null;
+
+  var startTime = new Date(yr, mo, 1).toISOString();
+  var endTime   = new Date(yr, mo + 1, 0, 23, 59, 59).toISOString();
+
+  try {
+    var data = await apiGet({
+      action: "slots",
+      eventTypeId: state.selectedPlan.id,
+      startTime: startTime,
+      endTime: endTime
+    });
+
+    // Cal.com v2 回傳格式：data.slots → { "YYYY-MM-DD": [{time: ISO}, ...] }
+    var raw = (data.data && data.data.slots) ? data.data.slots : {};
+    var parsed = {};
+    Object.keys(raw).forEach(function(dateKey) {
+      // dateKey 可能是 "2026-05-12T00:00:00.000Z"，取前10碼
+      var dk = dateKey.substring(0, 10);
+      parsed[dk] = raw[dateKey].map(function(slot) {
+        // slot.time 是 ISO 字串，轉為台灣時間 HH:mm
+        var d = new Date(slot.time);
+        var hh = String(d.getUTCHours() + 8).padStart(2, "0");
+        var mm = String(d.getUTCMinutes()).padStart(2, "0");
+        // 跨日修正
+        var hNum = parseInt(hh, 10);
+        if (hNum >= 24) { hh = String(hNum - 24).padStart(2,"0"); }
+        return { display: hh + ":" + mm, iso: slot.time };
       });
-    }
+    });
+    state.slotsCache[key] = parsed;
+  } catch(err) {
+    console.error("Slots error:", err);
+    state.slotsCache[key] = {};
+  }
+  renderCalendar();
+}
 
-    function closeWindow() {
-      if (typeof liff !== "undefined" && liff.isInClient()) {
-        liff.closeWindow();
-      } else {
-        window.close();
-      }
-    }
+function selectDate(dateStr) {
+  state.selectedDate = dateStr;
+  state.selectedSlot = "";
+  state.selectedSlotIso = "";
+  updateNextBtn();
+  renderCalendar();
 
-    init();
-  </script>
+  var key = dateStr.substring(0, 7);
+  var slotsData = state.slotsCache[key] || {};
+  var slots = slotsData[dateStr] || [];
+  renderSlots(dateStr, slots);
+}
+
+function renderSlots(dateStr, slots) {
+  var card = document.getElementById("slot-card");
+  var grid = document.getElementById("slot-grid");
+
+  // 標題：YYYY年MM月DD日 (週X)
+  var d = new Date(dateStr + "T00:00:00");
+  var weekNames = ["日","一","二","三","四","五","六"];
+  var label = (d.getFullYear()) + " 年 " + (d.getMonth()+1) + " 月 " + d.getDate() + " 日（週" + weekNames[d.getDay()] + "）";
+  document.getElementById("slot-date-label").textContent = label;
+
+  if (!slots.length) {
+    grid.innerHTML = '<div class="slot-empty">此日期無可用時段</div>';
+  } else {
+    grid.innerHTML = slots.map(function(slot) {
+      var sel = state.selectedSlot === slot.display ? " selected" : "";
+      return '<div class="slot-btn' + sel + '" onclick="selectSlot(\'' + slot.display + '\',\'' + slot.iso + '\')">' + slot.display + '</div>';
+    }).join('');
+  }
+
+  card.style.display = "block";
+  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function selectSlot(display, iso) {
+  state.selectedSlot = display;
+  state.selectedSlotIso = iso;
+  document.querySelectorAll('.slot-btn').forEach(function(el) { el.classList.remove('selected'); });
+  event.currentTarget.classList.add('selected');
+  updateNextBtn();
+}
+
+/* ── 摘要 ── */
+function renderSummary() {
+  var d = new Date(state.selectedDate + "T00:00:00");
+  var weekNames = ["日","一","二","三","四","五","六"];
+  var dateLabel = (d.getMonth()+1) + "/" + d.getDate() + "（週" + weekNames[d.getDay()] + "）" + state.selectedSlot;
+
+  document.getElementById("summary-plan").textContent = state.selectedPlan.title;
+  document.getElementById("summary-datetime").textContent = dateLabel;
+  document.getElementById("summary-duration").textContent = state.selectedPlan.length + " 分鐘";
+}
+
+/* ── 送出預約 ── */
+async function submitBooking() {
+  var name  = document.getElementById("input-name").value.trim();
+  var email = document.getElementById("input-email").value.trim();
+  var phone = document.getElementById("input-phone").value.trim();
+
+  if (!name) { alert("請填寫姓名"); return; }
+  if (!email || !email.includes("@")) { alert("請填寫有效的 Email"); return; }
+
+  var btn = document.getElementById("btn-next");
+  btn.classList.add("loading");
+  btn.disabled = true;
+
+  try {
+    var result = await apiPost({
+      action: "createBooking",
+      eventTypeId: state.selectedPlan.id,
+      startTime: state.selectedSlotIso,
+      name: name,
+      email: email,
+      phone: phone || undefined,
+      lineUserId: state.lineUserId,
+      timeZone: "Asia/Taipei",
+      language: "zh-TW"
+    });
+
+    // 顯示成功畫面
+    var d = new Date(state.selectedDate + "T00:00:00");
+    var weekNames = ["日","一","二","三","四","五","六"];
+    var dateLabel = (d.getMonth()+1) + "/" + d.getDate() + "（週" + weekNames[d.getDay()] + "）" + state.selectedSlot;
+
+    document.getElementById("suc-plan").textContent = state.selectedPlan.title;
+    document.getElementById("suc-datetime").textContent = dateLabel;
+    document.getElementById("suc-duration").textContent = state.selectedPlan.length + " 分鐘";
+    document.getElementById("suc-name").textContent = name;
+
+    hide("screen-booking");
+    show("screen-success");
+
+    // 返回鍵 → 關閉
+    history.pushState(null, "", location.href);
+    window.addEventListener("popstate", function() { closeWindow(); });
+
+  } catch(err) {
+    console.error("Booking error:", err);
+    alert("預約失敗：" + err.message + "\n請稍後再試，或聯絡我們的工作人員。");
+    btn.classList.remove("loading");
+    btn.disabled = false;
+  }
+}
+
+/* ── 關閉視窗 ── */
+function closeWindow() {
+  if (typeof liff !== "undefined" && liff.isInClient()) {
+    liff.closeWindow();
+  } else {
+    window.close();
+  }
+}
+
+/* ── 工具 ── */
+function show(id) {
+  var el = document.getElementById(id);
+  el.style.display = (id.startsWith("screen-") ? "flex" : "block");
+  if (id === "screen-booking") el.style.display = "flex";
+}
+function hide(id) { document.getElementById(id).style.display = "none"; }
+function pad2(n) { return String(n).padStart(2, "0"); }
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ── 啟動 ── */
+init();
+</script>
 </body>
 </html>
