@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>線上預約</title>
-  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -1244,8 +1243,23 @@ function esc(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+/* ── LIFF SDK 動態載入，確保載入完成才執行 ── */
+function loadLiffSdk(callback) {
+  if (typeof liff !== "undefined") { callback(); return; }
+  var s = document.createElement("script");
+  s.src = "https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js";
+  s.onload = function() { callback(); };
+  s.onerror = function() {
+    document.getElementById("error-msg").textContent =
+      "LIFF SDK 載入失敗，請確認網路連線後重試";
+    document.getElementById("screen-loading").style.display = "none";
+    document.getElementById("screen-error").style.display = "flex";
+  };
+  document.head.appendChild(s);
+}
+
 /* ── 啟動 ── */
-init();
+loadLiffSdk(init);
 </script>
 </body>
 </html>
