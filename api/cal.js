@@ -1,8 +1,3 @@
-/**
- * Vercel Serverless Function — Cal.com API 中繼層
- * 環境變數：CAL_API_KEY（在 Vercel Dashboard → Settings → Environment Variables 設定）
- */
-
 const CAL_API_BASE = "https://api.cal.com/v2";
 
 module.exports = async function handler(req, res) {
@@ -10,14 +5,10 @@ module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   const apiKey = process.env.CAL_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: "CAL_API_KEY 未設定" });
-  }
+  if (!apiKey) return res.status(500).json({ error: "CAL_API_KEY 未設定" });
 
   const headers = {
     "Authorization": "Bearer " + apiKey,
@@ -29,26 +20,55 @@ module.exports = async function handler(req, res) {
     if (req.method === "GET") {
       const { action, eventTypeId, startTime, endTime } = req.query;
 
+      // ── debug：看原始回傳結構 ──
+      if (action === "debug") {
+        const r = await fetch(CAL_API_BASE + "/event-types", { headers });
+        const raw = await r.json();
+        return res.status(200).json({ status: r.status, raw });
+      }
+
+      // ── 取得方案 ──
       if (action === "eventTypes") {
         const r = await fetch(CAL_API_BASE + "/event-types", { headers });
         const data = await r.json();
 
-        const groups = (data.data && data.data.eventTypeGroups) ? data.data.eventTypeGroups : [];
-        const eventTypes = groups
-          .flatMap(function(g) { return g.eventTypes || []; })
-          .map(function(et) {
-            return {
-              id: et.id,
-              slug: et.slug,
-              title: et.title,
-              length: et.length,
-              description: et.description || ""
-            };
-          });
+        // Cal.com v2 可能的結構：
+        // 1. data.data.eventTypeGroups[].eventTypes[]
+        // 2. data.data[]  (直接陣列)
+        // 3. data.eventTypes[]
+        let eventTypes = [];
 
-        return res.status(200).json({ eventTypes: eventTypes });
+        if (data.data) {
+          if (Array.isArray(data.data)) {
+            // 直接陣列
+            eventTypes = data.data;
+          } else if (data.data.eventTypeGroups) {
+            // 群組結構
+            eventTypes = data.data.eventTypeGroups
+              .flatMap(function(g) { return g.eventTypes || []; });
+          } else if (data.data.eventTypes) {
+            eventTypes = data.data.eventTypes;
+          }
+        } else if (Array.isArray(data.eventTypes)) {
+          eventTypes = data.eventTypes;
+        } else if (Array.isArray(data)) {
+          eventTypes = data;
+        }
+
+        const result = eventTypes.map(function(et) {
+          return {
+            id: et.id,
+            slug: et.slug,
+            title: et.title,
+            length: et.length,
+            description: et.description || ""
+          };
+        });
+
+        return res.status(200).json({ eventTypes: result });
       }
 
+      // ── 取得時段 ──
       if (action === "slots") {
         if (!eventTypeId || !startTime || !endTime) {
           return res.status(400).json({ error: "缺少參數" });
@@ -65,6 +85,7 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "未知 action" });
     }
 
+    // ── 建立預約 ──
     if (req.method === "POST") {
       const body = req.body;
       if (!body || body.action !== "createBooking") {
