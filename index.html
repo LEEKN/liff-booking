@@ -1079,7 +1079,7 @@ async function fetchMonthSlots(yr, mo) {
   try {
     var data = await apiGet({
       action: "slots",
-      eventTypeId: state.selectedPlan.id,
+      eventSlug: state.selectedPlan.slug,
       startTime: startTime,
       endTime: endTime
     });
