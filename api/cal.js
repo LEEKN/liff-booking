@@ -63,28 +63,46 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        const eventTypes = raw.map(function(et) {
-          return {
-            id:          et.id,
-            slug:        et.slug,
-            title:       et.title,
-            length:      et.length || et.lengthInMinutes,
-            description: et.description || ""
-          };
-        });
+        // 從回傳資料取得真實 username（含後綴如 tomisacat-eur7wq）
+        const realUsername = (raw.length > 0 && raw[0].users && raw[0].users[0])
+          ? raw[0].users[0].username
+          : calUsername;
+
+        const eventTypes = raw
+          // 過濾隱藏方案與測試用方案（slug 含 checking 或 test）
+          .filter(function(et) {
+            if (et.hidden) return false;
+            var slug = (et.slug || "").toLowerCase();
+            if (slug.includes("checking") || slug.includes("test")) return false;
+            return true;
+          })
+          .map(function(et) {
+            return {
+              id:           et.id,
+              slug:         et.slug,
+              title:        et.title,
+              length:       et.length || et.lengthInMinutes,
+              description:  et.description || "",
+              realUsername: realUsername
+            };
+          });
 
         return res.status(200).json({ eventTypes });
       }
 
       // ── 取得可用時段 ──
       if (action === "slots") {
+        const { realUsername: ruQuery } = req.query;
         if (!eventSlug || !startTime || !endTime) {
           return res.status(400).json({ error: "缺少參數：eventSlug, startTime, endTime" });
         }
 
+        // 優先用前端傳來的 realUsername（含後綴），fallback 到環境變數
+        const usernameForSlots = ruQuery || calUsername;
+
         // Cal.com v2 slots 用 username + eventSlug，不用 eventTypeId
         const url = CAL_API_BASE + "/slots"
-          + "?username=" + encodeURIComponent(calUsername)
+          + "?username=" + encodeURIComponent(usernameForSlots)
           + "&eventSlug=" + encodeURIComponent(eventSlug)
           + "&startTime=" + encodeURIComponent(startTime)
           + "&endTime="   + encodeURIComponent(endTime);

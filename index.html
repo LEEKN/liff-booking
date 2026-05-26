@@ -837,7 +837,7 @@
 /* ======================================================
    ★ 請修改以下設定
    ====================================================== */
-var LIFF_ID    = "2010006924-yy3gmsF5";       // 第 9 節取得的 LIFF ID
+var LIFF_ID    = "YOUR_LIFF_ID";       // 第 9 節取得的 LIFF ID
 var API_BASE   = "";                   // 留空 = 使用相對路徑（部署在同一個 Vercel 專案）
                                        // 若獨立部署，填入 Vercel Function URL，例如 https://xxx.vercel.app
 /* ====================================================== */
@@ -847,7 +847,8 @@ var state = {
   step: 1,
   lineUserId: "",
   eventTypes: [],
-  selectedPlan: null,        // { id, slug, title, length, description }
+  selectedPlan: null,        // { id, slug, title, length, description, realUsername }
+  realUsername: "",
   calendarYear: 0,
   calendarMonth: 0,          // 0-based
   slotsCache: {},            // "YYYY-MM" → { "YYYY-MM-DD": ["HH:mm", ...] }
@@ -893,6 +894,10 @@ async function init() {
 async function loadEventTypes() {
   var data = await apiGet({ action: "eventTypes" });
   state.eventTypes = data.eventTypes || [];
+  // 從第一個方案取得真實 username（含後綴）
+  if (state.eventTypes.length > 0 && state.eventTypes[0].realUsername) {
+    state.realUsername = state.eventTypes[0].realUsername;
+  }
   renderPlanList();
 }
 
@@ -1080,6 +1085,7 @@ async function fetchMonthSlots(yr, mo) {
     var data = await apiGet({
       action: "slots",
       eventSlug: state.selectedPlan.slug,
+      realUsername: state.realUsername || "",
       startTime: startTime,
       endTime: endTime
     });
