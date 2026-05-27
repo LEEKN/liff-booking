@@ -193,9 +193,6 @@
     }
 
     /* ══ 步驟一：方案選擇 ══ */
-    #step-1 { display: block; }
-    #step-2 { display: none; }
-    #step-3 { display: none; }
 
     .plan-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
     .plan-item {
@@ -661,28 +658,27 @@
       </div>
     </div>
 
-    <!-- 步驟指示器 -->
+    <!-- 步驟指示器（兩步）-->
     <div class="step-indicator">
       <div class="step-dot active" id="dot-1">1</div>
       <div class="step-line" id="line-1"></div>
       <div class="step-dot" id="dot-2">2</div>
-      <div class="step-line" id="line-2"></div>
-      <div class="step-dot" id="dot-3">3</div>
     </div>
     <div class="step-labels">
-      <span class="step-label active" id="label-1">選擇方案</span>
-      <span class="step-label" id="label-2">選擇時段</span>
-      <span class="step-label" id="label-3">填寫資料</span>
+      <span class="step-label active" id="label-1">選擇方案與時段</span>
+      <span class="step-label" id="label-2">填寫資料</span>
     </div>
   </div>
 
   <!-- 內容區 -->
   <div class="booking-content">
 
-    <!-- ── 步驟一：選擇方案 ── -->
+    <!-- ── 步驟一：選擇方案 + 日期時段（同一頁）── -->
     <div id="step-1">
       <div style="height:16px"></div>
-      <div class="section-card">
+
+      <!-- 方案選擇 -->
+      <div class="section-card" style="margin-bottom:12px">
         <div class="section-title">請選擇服務方案</div>
         <div class="plan-list" id="plan-list">
           <div style="text-align:center;padding:32px;color:var(--ink-light);font-size:14px;">
@@ -691,43 +687,42 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ── 步驟二：選擇日期 & 時段 ── -->
-    <div id="step-2">
-      <div style="height:16px"></div>
-      <div class="section-card" style="margin-bottom:12px">
-        <div class="section-title">選擇日期</div>
-        <div class="calendar-nav">
-          <button class="cal-nav-btn" id="btn-prev-month" onclick="changeMonth(-1)">&#8249;</button>
-          <span class="cal-month-label" id="cal-month-label">—</span>
-          <button class="cal-nav-btn" id="btn-next-month" onclick="changeMonth(1)">&#8250;</button>
+      <!-- 日曆（選方案後才顯示）-->
+      <div id="calendar-section" style="display:none">
+        <div class="section-card" style="margin-bottom:12px">
+          <div class="section-title">選擇日期</div>
+          <div class="calendar-nav">
+            <button class="cal-nav-btn" id="btn-prev-month" onclick="changeMonth(-1)">&#8249;</button>
+            <span class="cal-month-label" id="cal-month-label">—</span>
+            <button class="cal-nav-btn" id="btn-next-month" onclick="changeMonth(1)">&#8250;</button>
+          </div>
+          <div class="cal-weekdays">
+            <div class="cal-weekday sun">日</div>
+            <div class="cal-weekday">一</div>
+            <div class="cal-weekday">二</div>
+            <div class="cal-weekday">三</div>
+            <div class="cal-weekday">四</div>
+            <div class="cal-weekday">五</div>
+            <div class="cal-weekday sat">六</div>
+          </div>
+          <div class="cal-grid" id="cal-grid">
+            <div class="cal-loading">載入中…</div>
+          </div>
         </div>
-        <div class="cal-weekdays">
-          <div class="cal-weekday sun">日</div>
-          <div class="cal-weekday">一</div>
-          <div class="cal-weekday">二</div>
-          <div class="cal-weekday">三</div>
-          <div class="cal-weekday">四</div>
-          <div class="cal-weekday">五</div>
-          <div class="cal-weekday sat">六</div>
-        </div>
-        <div class="cal-grid" id="cal-grid">
-          <div class="cal-loading">載入中…</div>
+
+        <!-- 時段列表 -->
+        <div class="section-card" id="slot-card" style="display:none">
+          <div class="section-title" id="slot-date-label">可預約時段</div>
+          <div class="slot-section">
+            <div class="slot-grid" id="slot-grid"></div>
+          </div>
         </div>
       </div>
-
-      <!-- 時段列表 -->
-      <div class="section-card" id="slot-card" style="display:none">
-        <div class="section-title" id="slot-date-label">可預約時段</div>
-        <div class="slot-section">
-          <div class="slot-grid" id="slot-grid"></div>
-        </div>
-      </div>
     </div>
 
-    <!-- ── 步驟三：填寫資料 ── -->
-    <div id="step-3">
+    <!-- ── 步驟二：填寫資料 ── -->
+    <div id="step-2" style="display:none">
       <div style="height:16px"></div>
 
       <!-- 預約摘要 -->
@@ -775,8 +770,8 @@
   <!-- 底部按鈕 -->
   <div class="btn-area">
     <button class="btn-back" id="btn-back" onclick="goPrev()" style="display:none">上一步</button>
-    <button class="btn-next" id="btn-next" onclick="goNext()">
-      <span class="btn-text">選擇時段 →</span>
+    <button class="btn-next" id="btn-next" onclick="goNext()" disabled>
+      <span class="btn-text">填寫資料 →</span>
       <div class="btn-spinner"></div>
     </button>
   </div>
@@ -837,7 +832,7 @@
 /* ======================================================
    ★ 請修改以下設定
    ====================================================== */
-var LIFF_ID    = "2010006924-yy3gmsF5";       // 第 9 節取得的 LIFF ID
+var LIFF_ID    = "YOUR_LIFF_ID";       // 第 9 節取得的 LIFF ID
 var API_BASE   = "";                   // 留空 = 使用相對路徑（部署在同一個 Vercel 專案）
                                        // 若獨立部署，填入 Vercel Function URL，例如 https://xxx.vercel.app
 /* ====================================================== */
@@ -923,30 +918,48 @@ function renderPlanList() {
 }
 
 function selectPlan(id) {
+  var prevId = state.selectedPlan ? state.selectedPlan.id : null;
   state.selectedPlan = state.eventTypes.find(function(e) { return e.id === id; });
+
   document.querySelectorAll('.plan-item').forEach(function(el) { el.classList.remove('selected'); });
   document.getElementById('plan-' + id).classList.add('selected');
+
+  // 清空日期與時段選擇
+  state.selectedDate = "";
+  state.selectedSlot = "";
+  state.selectedSlotIso = "";
+  state.slotsCache = {};  // 切換方案時清空快取
+  hide("slot-card");
+
+  // 顯示日曆區塊（第一次選方案時）
+  var calSection = document.getElementById("calendar-section");
+  calSection.style.display = "block";
+
+  // 初始化日曆
+  initCalendar();
+
+  // 滑動到日曆
+  setTimeout(function() {
+    calSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 100);
+
   updateNextBtn();
 }
 
 /* ── 步驟導航 ── */
 function goNext() {
   if (state.step === 1) {
-    if (!state.selectedPlan) return;
+    // 步驟一：方案+時段都選好才能繼續
+    if (!state.selectedPlan || !state.selectedSlotIso) return;
     goStep(2);
-    initCalendar();
-  } else if (state.step === 2) {
-    if (!state.selectedSlotIso) return;
-    goStep(3);
     renderSummary();
-  } else if (state.step === 3) {
+  } else if (state.step === 2) {
     submitBooking();
   }
 }
 
 function goPrev() {
   if (state.step === 2) goStep(1);
-  else if (state.step === 3) goStep(2);
 }
 
 function goStep(n) {
@@ -959,15 +972,13 @@ function goStep(n) {
 }
 
 function updateStepUI() {
-  [1,2,3].forEach(function(i) {
+  [1,2].forEach(function(i) {
     var dot = document.getElementById("dot-" + i);
     var label = document.getElementById("label-" + i);
     dot.className = "step-dot" + (i === state.step ? " active" : i < state.step ? " done" : "");
     label.className = "step-label" + (i === state.step ? " active" : "");
   });
-  [1,2].forEach(function(i) {
-    document.getElementById("line-" + i).className = "step-line" + (i < state.step ? " done" : "");
-  });
+  document.getElementById("line-1").className = "step-line" + (state.step > 1 ? " done" : "");
   var backBtn = document.getElementById("btn-back");
   backBtn.style.display = state.step > 1 ? "block" : "none";
 }
@@ -976,11 +987,9 @@ function updateNextBtn() {
   var btn = document.getElementById("btn-next");
   var textEl = btn.querySelector(".btn-text");
   if (state.step === 1) {
-    textEl.textContent = "選擇時段 →";
-    btn.disabled = !state.selectedPlan;
-  } else if (state.step === 2) {
     textEl.textContent = "填寫資料 →";
-    btn.disabled = !state.selectedSlotIso;
+    // 需要方案和時段都選好才能點
+    btn.disabled = !(state.selectedPlan && state.selectedSlotIso);
   } else {
     textEl.textContent = "確認預約";
     btn.disabled = false;
@@ -1089,8 +1098,8 @@ async function fetchMonthSlots(yr, mo) {
       endTime: endTime
     });
 
-    // Cal.com v2 回傳格式：data.slots → { "YYYY-MM-DD": [{time: ISO}, ...] }
-    var raw = (data.data && data.data.slots) ? data.data.slots : {};
+    // Cal.com v2 slots 回傳格式：{ data: { "YYYY-MM-DD": [{start: ISO},...] }, status: "success" }
+    var raw = (data.data && typeof data.data === "object") ? data.data : (data.slots || {});
     var parsed = {};
     Object.keys(raw).forEach(function(dateKey) {
       // dateKey 格式 "2026-05-12" 或 "2026-05-12T00:00:00.000Z"，取前10碼
@@ -1232,10 +1241,17 @@ function closeWindow() {
 /* ── 工具 ── */
 function show(id) {
   var el = document.getElementById(id);
-  el.style.display = (id.startsWith("screen-") ? "flex" : "block");
-  if (id === "screen-booking") el.style.display = "flex";
+  if (!el) return;
+  if (id.startsWith("screen-") || id === "screen-booking") {
+    el.style.display = "flex";
+  } else {
+    el.style.display = "block";
+  }
 }
-function hide(id) { document.getElementById(id).style.display = "none"; }
+function hide(id) {
+  var el = document.getElementById(id);
+  if (el) el.style.display = "none";
+}
 function pad2(n) { return String(n).padStart(2, "0"); }
 function esc(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
