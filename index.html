@@ -870,7 +870,7 @@ async function apiPost(body) {
     body: JSON.stringify(body)
   });
   var data = await r.json();
-  if (!r.ok) throw new Error(data.error || "API error " + r.status);
+  if (!r.ok) throw new Error(JSON.stringify(data));
   return data;
 }
 
@@ -1223,7 +1223,13 @@ async function submitBooking() {
 
   } catch(err) {
     console.error("Booking error:", err);
-    alert("預約失敗：" + err.message + "\n請稍後再試，或聯絡我們的工作人員。");
+    // 顯示完整錯誤內容方便除錯
+    var msg = err.message || "未知錯誤";
+    try {
+      var errData = JSON.parse(msg);
+      msg = JSON.stringify(errData, null, 2);
+    } catch(e) {}
+    alert("預約失敗：\n" + msg);
     btn.classList.remove("loading");
     btn.disabled = false;
   }
