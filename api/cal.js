@@ -111,10 +111,14 @@ module.exports = async function handler(req, res) {
           : phone.startsWith("0") ? "+886" + phone.slice(1)
           : "+" + phone;
 
-        // attendeePhoneNumber 放在 bookingFieldsResponses
         payload.bookingFieldsResponses = { attendeePhoneNumber: intlPhone };
-        // attendee 裡也放一份
         payload.attendee.phoneNumber = intlPhone;
+      }
+
+      // lineUserId 傳入 bookingFieldsResponses，Make 用來發客戶通知
+      if (body.lineUserId) {
+        payload.bookingFieldsResponses = payload.bookingFieldsResponses || {};
+        payload.bookingFieldsResponses.lineUserId = body.lineUserId;
       }
 
       console.log("Booking payload:", JSON.stringify(payload));
