@@ -125,11 +125,12 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: "未知 action" });
       }
 
-      // Cal.com v2 bookings 正確格式（2024-08-13）
-      // language 放在 attendee 裡，最外層不需要 timeZone/language
+      // Cal.com v2 bookings：最外層與 attendee 都要有 timeZone/language
       const payload = {
         eventTypeId: Number(body.eventTypeId),
         start:       body.startTime,
+        timeZone:    "Asia/Taipei",
+        language:    "zh-TW",
         metadata:    {},
         attendee: {
           name:     body.name,
