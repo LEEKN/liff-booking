@@ -1,9 +1,6 @@
 /**
  * Vercel Serverless Function — Cal.com API 中繼層
- *
- * 環境變數（Vercel Dashboard → Settings → Environment Variables）：
- *   CAL_API_KEY      Cal.com API Key（原始字串，不含 cal_live_ 前綴）
- *   CAL_USERNAME     Cal.com 帳號名稱（例如 tomisacat）
+ * 環境變數：CAL_API_KEY, CAL_USERNAME
  */
 
 const CAL_API_BASE = "https://api.cal.com/v2";
@@ -20,157 +17,110 @@ module.exports = async function handler(req, res) {
   if (!apiKey)      return res.status(500).json({ error: "CAL_API_KEY 未設定" });
   if (!calUsername) return res.status(500).json({ error: "CAL_USERNAME 未設定" });
 
-  // Cal.com v2 需要 cal_live_ 前綴
   const token = apiKey.startsWith("cal_") ? apiKey : "cal_live_" + apiKey;
 
-  const headers = {
-    "Authorization": "Bearer " + token,
-    "Content-Type": "application/json",
-    "cal-api-version": "2024-06-14"
-  };
-
   try {
+    // ══ GET ══
     if (req.method === "GET") {
-      const { action, eventSlug, startTime, endTime } = req.query;
+      const { action, eventTypeId, startTime, endTime } = req.query;
 
-      // ── debug：看原始回傳 ──
+      // debug
       if (action === "debug") {
         const r = await fetch(
           CAL_API_BASE + "/event-types?username=" + encodeURIComponent(calUsername),
-          { headers }
+          { headers: { "Authorization": "Bearer " + token, "cal-api-version": "2024-06-14" } }
         );
-        const raw = await r.json();
-        return res.status(200).json({ status: r.status, raw });
+        return res.status(200).json({ status: r.status, raw: await r.json() });
       }
 
-      // ── 取得所有方案 ──
+      // 取得方案
       if (action === "eventTypes") {
         const r = await fetch(
           CAL_API_BASE + "/event-types?username=" + encodeURIComponent(calUsername),
-          { headers }
+          { headers: { "Authorization": "Bearer " + token, "cal-api-version": "2024-06-14" } }
         );
         const data = await r.json();
 
-        // v2 with 2024-06-14: data.data 為陣列
         let raw = [];
-        if (Array.isArray(data.data)) {
-          raw = data.data;
-        } else if (data.data && Array.isArray(data.data.eventTypes)) {
-          raw = data.data.eventTypes;
-        } else if (data.data && Array.isArray(data.data.eventTypeGroups)) {
-          raw = data.data.eventTypeGroups.flatMap(function(g) {
-            return g.eventTypes || [];
-          });
-        }
+        if (Array.isArray(data.data)) raw = data.data;
+        else if (data.data && Array.isArray(data.data.eventTypes)) raw = data.data.eventTypes;
+        else if (data.data && Array.isArray(data.data.eventTypeGroups))
+          raw = data.data.eventTypeGroups.flatMap(g => g.eventTypes || []);
 
-        // 從回傳資料取得真實 username（含後綴如 tomisacat-eur7wq）
         const realUsername = (raw.length > 0 && raw[0].users && raw[0].users[0])
-          ? raw[0].users[0].username
-          : calUsername;
+          ? raw[0].users[0].username : calUsername;
 
         const eventTypes = raw
-          // 過濾隱藏方案與測試用方案（slug 含 checking 或 test）
-          .filter(function(et) {
+          .filter(et => {
             if (et.hidden) return false;
-            var slug = (et.slug || "").toLowerCase();
-            if (slug.includes("checking") || slug.includes("test")) return false;
-            return true;
+            const slug = (et.slug || "").toLowerCase();
+            return !slug.includes("checking") && !slug.includes("test");
           })
-          .map(function(et) {
-            return {
-              id:           et.id,
-              slug:         et.slug,
-              title:        et.title,
-              length:       et.length || et.lengthInMinutes,
-              description:  et.description || "",
-              realUsername: realUsername
-            };
-          });
+          .map(et => ({
+            id: et.id, slug: et.slug, title: et.title,
+            length: et.length || et.lengthInMinutes,
+            description: et.description || "", realUsername
+          }));
 
         return res.status(200).json({ eventTypes });
       }
 
-      // ── 取得可用時段 ──
+      // 取得時段（2024-09-04 版本，用 eventTypeId + start/end）
       if (action === "slots") {
-        const { eventTypeId: etId, startTime, endTime } = req.query;
-        if (!etId || !startTime || !endTime) {
-          return res.status(400).json({ error: "缺少參數：eventTypeId, startTime, endTime" });
-        }
-
-        // slots 端點需要獨立的 api-version: 2024-09-04
-        // 參數：eventTypeId + start/end（不是 startTime/endTime）
-        const slotsHeaders = {
-          "Authorization": "Bearer " + token,
-          "Content-Type": "application/json",
-          "cal-api-version": "2024-09-04"
-        };
+        if (!eventTypeId || !startTime || !endTime)
+          return res.status(400).json({ error: "缺少參數" });
 
         const url = CAL_API_BASE + "/slots"
-          + "?eventTypeId=" + encodeURIComponent(etId)
+          + "?eventTypeId=" + encodeURIComponent(eventTypeId)
           + "&start=" + encodeURIComponent(startTime)
-          + "&end="   + encodeURIComponent(endTime);
+          + "&end=" + encodeURIComponent(endTime);
 
-        const r    = await fetch(url, { slotsHeaders, headers: slotsHeaders });
-        const data = await r.json();
-        return res.status(200).json(data);
+        const r = await fetch(url, {
+          headers: { "Authorization": "Bearer " + token, "cal-api-version": "2024-09-04" }
+        });
+        return res.status(200).json(await r.json());
       }
 
       return res.status(400).json({ error: "未知 action" });
     }
 
-    // ── 建立預約 ──
+    // ══ POST：建立預約 ══
     if (req.method === "POST") {
       const body = req.body;
-      if (!body || body.action !== "createBooking") {
+      if (!body || body.action !== "createBooking")
         return res.status(400).json({ error: "未知 action" });
-      }
 
-      // Cal.com v2 bookings：最外層與 attendee 都要有 timeZone/language
+      // 最簡 payload，只放 Cal.com 文件明確要求的欄位
       const payload = {
         eventTypeId: Number(body.eventTypeId),
-        start:       body.startTime,
-        timeZone:    "Asia/Taipei",
-        language:    "zh-TW",
-        metadata:    {},
+        start: body.startTime,
+        metadata: {},
         attendee: {
-          name:     body.name,
-          email:    body.email,
+          name: body.name,
+          email: body.email,
           timeZone: "Asia/Taipei",
           language: "zh-TW"
-        },
-        bookingFieldsResponses: {
-          name:  body.name,
-          email: body.email
         }
       };
 
-      if (body.phone) {
-        payload.attendee.phoneNumber = body.phone;
-        payload.bookingFieldsResponses.attendeePhoneNumber = body.phone;
-      }
+      if (body.phone) payload.attendee.phoneNumber = body.phone;
 
-      if (body.lineUserId) {
-        payload.bookingFieldsResponses.lineUserId = body.lineUserId;
-      }
-
-      // 送出前 log payload 方便除錯
       console.log("Booking payload:", JSON.stringify(payload));
 
-      const r    = await fetch(CAL_API_BASE + "/bookings", {
-        method:  "POST",
-        headers: headers,
-        body:    JSON.stringify(payload)
+      const r = await fetch(CAL_API_BASE + "/bookings", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json",
+          "cal-api-version": "2024-08-13"
+        },
+        body: JSON.stringify(payload)
       });
-      const data = await r.json();
 
+      const data = await r.json();
       console.log("Booking response:", r.status, JSON.stringify(data));
 
-      if (!r.ok) {
-        return res.status(r.status).json({
-          error:  "預約失敗",
-          detail: data
-        });
-      }
+      if (!r.ok) return res.status(r.status).json({ error: "預約失敗", detail: data });
       return res.status(200).json({ success: true, booking: data.data });
     }
 
