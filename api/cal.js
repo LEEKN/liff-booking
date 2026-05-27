@@ -125,26 +125,33 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: "未知 action" });
       }
 
+      // Cal.com v2 bookings: 用 start（不是 startTime），attendee 不含 language
       const payload = {
         eventTypeId: Number(body.eventTypeId),
-        startTime:   body.startTime,
+        start:       body.startTime,
         attendee: {
           name:     body.name,
           email:    body.email,
-          timeZone: "Asia/Taipei",
-          language: "zh-TW"
+          timeZone: "Asia/Taipei"
         },
-        responses: {
-          name:        body.name,
-          email:       body.email,
-          lineUserId:  body.lineUserId || ""
+        // 標準欄位放 bookingFieldsResponses
+        bookingFieldsResponses: {
+          name:  body.name,
+          email: body.email
         }
       };
 
       if (body.phone) {
-        payload.attendee.phoneNumber = body.phone;
-        payload.responses.phone      = body.phone;
+        payload.attendee.phoneNumber            = body.phone;
+        payload.bookingFieldsResponses.attendeePhoneNumber = body.phone;
       }
+
+      if (body.lineUserId) {
+        payload.bookingFieldsResponses.lineUserId = body.lineUserId;
+      }
+
+      // 送出前 log payload 方便除錯
+      console.log("Booking payload:", JSON.stringify(payload));
 
       const r    = await fetch(CAL_API_BASE + "/bookings", {
         method:  "POST",
@@ -153,9 +160,11 @@ module.exports = async function handler(req, res) {
       });
       const data = await r.json();
 
+      console.log("Booking response:", r.status, JSON.stringify(data));
+
       if (!r.ok) {
         return res.status(r.status).json({
-          error:  data.message || "預約失敗",
+          error:  "預約失敗",
           detail: data
         });
       }
