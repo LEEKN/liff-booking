@@ -125,16 +125,18 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: "未知 action" });
       }
 
-      // Cal.com v2 bookings: 用 start（不是 startTime），attendee 不含 language
+      // Cal.com v2 bookings 必填結構
       const payload = {
         eventTypeId: Number(body.eventTypeId),
         start:       body.startTime,
+        timeZone:    "Asia/Taipei",
+        language:    "zh-TW",
+        metadata:    {},
         attendee: {
           name:     body.name,
           email:    body.email,
           timeZone: "Asia/Taipei"
         },
-        // 標準欄位放 bookingFieldsResponses
         bookingFieldsResponses: {
           name:  body.name,
           email: body.email
@@ -142,7 +144,7 @@ module.exports = async function handler(req, res) {
       };
 
       if (body.phone) {
-        payload.attendee.phoneNumber            = body.phone;
+        payload.attendee.phoneNumber = body.phone;
         payload.bookingFieldsResponses.attendeePhoneNumber = body.phone;
       }
 

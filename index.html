@@ -750,11 +750,11 @@
             <input class="form-input" type="text" id="input-name" placeholder="請輸入您的姓名" autocomplete="name">
           </div>
           <div class="form-row">
-            <label class="form-label">Email<span>*</span></label>
+            <label class="form-label">Email</label>
             <input class="form-input" type="email" id="input-email" placeholder="example@mail.com" autocomplete="email" inputmode="email">
           </div>
           <div class="form-row">
-            <label class="form-label">手機號碼</label>
+            <label class="form-label">手機號碼<span>*</span></label>
             <input class="form-input" type="tel" id="input-phone" placeholder="0912-345-678" autocomplete="tel" inputmode="tel">
           </div>
           <div class="form-row">
@@ -832,7 +832,7 @@
 /* ======================================================
    ★ 請修改以下設定
    ====================================================== */
-var LIFF_ID    = "2010006924-yy3gmsF5";       // 第 9 節取得的 LIFF ID
+var LIFF_ID    = "YOUR_LIFF_ID";       // 第 9 節取得的 LIFF ID
 var API_BASE   = "";                   // 留空 = 使用相對路徑（部署在同一個 Vercel 專案）
                                        // 若獨立部署，填入 Vercel Function URL，例如 https://xxx.vercel.app
 /* ====================================================== */
@@ -1185,19 +1185,23 @@ async function submitBooking() {
   var phone = document.getElementById("input-phone").value.trim();
 
   if (!name) { alert("請填寫姓名"); return; }
-  if (!email || !email.includes("@")) { alert("請填寫有效的 Email"); return; }
+  if (!phone) { alert("請填寫手機號碼"); return; }
+  if (email && !email.includes("@")) { alert("Email 格式不正確"); return; }
 
   var btn = document.getElementById("btn-next");
   btn.classList.add("loading");
   btn.disabled = true;
 
   try {
+    // Cal.com API 的 email 為必填，若顧客未填則用手機號碼產生虛擬 email
+    var emailToSend = email || (phone.replace(/[^0-9]/g, "") + "@noemail.local");
+
     var result = await apiPost({
       action: "createBooking",
       eventTypeId: state.selectedPlan.id,
       startTime: state.selectedSlotIso,
       name: name,
-      email: email,
+      email: emailToSend,
       phone: phone || undefined,
       lineUserId: state.lineUserId,
       timeZone: "Asia/Taipei",
