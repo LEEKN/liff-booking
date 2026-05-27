@@ -103,7 +103,19 @@ module.exports = async function handler(req, res) {
         }
       };
 
-      if (body.phone) payload.attendee.phoneNumber = body.phone;
+      // 電話號碼轉國際格式（09xxxxxxxx → +8869xxxxxxxx）
+      if (body.phone) {
+        const phone = body.phone.trim().replace(/[\s\-]/g, "");
+        const intlPhone = phone.startsWith("+") ? phone
+          : phone.startsWith("09") ? "+886" + phone.slice(1)
+          : phone.startsWith("0") ? "+886" + phone.slice(1)
+          : "+" + phone;
+
+        // attendeePhoneNumber 放在 bookingFieldsResponses
+        payload.bookingFieldsResponses = { attendeePhoneNumber: intlPhone };
+        // attendee 裡也放一份
+        payload.attendee.phoneNumber = intlPhone;
+      }
 
       console.log("Booking payload:", JSON.stringify(payload));
 
