@@ -92,22 +92,25 @@ module.exports = async function handler(req, res) {
 
       // ── 取得可用時段 ──
       if (action === "slots") {
-        const { realUsername: ruQuery } = req.query;
-        if (!eventSlug || !startTime || !endTime) {
-          return res.status(400).json({ error: "缺少參數：eventSlug, startTime, endTime" });
+        const { eventTypeId: etId, startTime, endTime } = req.query;
+        if (!etId || !startTime || !endTime) {
+          return res.status(400).json({ error: "缺少參數：eventTypeId, startTime, endTime" });
         }
 
-        // 優先用前端傳來的 realUsername（含後綴），fallback 到環境變數
-        const usernameForSlots = ruQuery || calUsername;
+        // slots 端點需要獨立的 api-version: 2024-09-04
+        // 參數：eventTypeId + start/end（不是 startTime/endTime）
+        const slotsHeaders = {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json",
+          "cal-api-version": "2024-09-04"
+        };
 
-        // Cal.com v2 slots 用 username + eventSlug，不用 eventTypeId
         const url = CAL_API_BASE + "/slots"
-          + "?username=" + encodeURIComponent(usernameForSlots)
-          + "&eventSlug=" + encodeURIComponent(eventSlug)
-          + "&startTime=" + encodeURIComponent(startTime)
-          + "&endTime="   + encodeURIComponent(endTime);
+          + "?eventTypeId=" + encodeURIComponent(etId)
+          + "&start=" + encodeURIComponent(startTime)
+          + "&end="   + encodeURIComponent(endTime);
 
-        const r    = await fetch(url, { headers });
+        const r    = await fetch(url, { slotsHeaders, headers: slotsHeaders });
         const data = await r.json();
         return res.status(200).json(data);
       }

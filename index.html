@@ -1084,8 +1084,7 @@ async function fetchMonthSlots(yr, mo) {
   try {
     var data = await apiGet({
       action: "slots",
-      eventSlug: state.selectedPlan.slug,
-      realUsername: state.realUsername || "",
+      eventTypeId: state.selectedPlan.id,
       startTime: startTime,
       endTime: endTime
     });
@@ -1094,17 +1093,17 @@ async function fetchMonthSlots(yr, mo) {
     var raw = (data.data && data.data.slots) ? data.data.slots : {};
     var parsed = {};
     Object.keys(raw).forEach(function(dateKey) {
-      // dateKey 可能是 "2026-05-12T00:00:00.000Z"，取前10碼
+      // dateKey 格式 "2026-05-12" 或 "2026-05-12T00:00:00.000Z"，取前10碼
       var dk = dateKey.substring(0, 10);
       parsed[dk] = raw[dateKey].map(function(slot) {
-        // slot.time 是 ISO 字串，轉為台灣時間 HH:mm
-        var d = new Date(slot.time);
-        var hh = String(d.getUTCHours() + 8).padStart(2, "0");
-        var mm = String(d.getUTCMinutes()).padStart(2, "0");
-        // 跨日修正
-        var hNum = parseInt(hh, 10);
-        if (hNum >= 24) { hh = String(hNum - 24).padStart(2,"0"); }
-        return { display: hh + ":" + mm, iso: slot.time };
+        // 2024-09-04 版回傳 slot.start，舊版回傳 slot.time，兩者相容
+        var isoStr = slot.start || slot.time;
+        var d = new Date(isoStr);
+        // 轉台灣時間（UTC+8）
+        var totalMins = d.getUTCHours() * 60 + d.getUTCMinutes() + 480;
+        var hh = String(Math.floor(totalMins / 60) % 24).padStart(2, "0");
+        var mm = String(totalMins % 60).padStart(2, "0");
+        return { display: hh + ":" + mm, iso: isoStr };
       });
     });
     state.slotsCache[key] = parsed;
