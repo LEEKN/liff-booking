@@ -115,7 +115,7 @@ module.exports = async function handler(req, res) {
         payload.attendee.phoneNumber = intlPhone;
       }
 
-      // lineUserId 傳入 bookingFieldsResponses，Make 用來發客戶通知
+      // lineUserId 傳入 bookingFieldsResponses，webhook.js / reminder.js 用來發客戶通知
       if (body.lineUserId) {
         payload.bookingFieldsResponses = payload.bookingFieldsResponses || {};
         payload.bookingFieldsResponses.lineUserId = body.lineUserId;
