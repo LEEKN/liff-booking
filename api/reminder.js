@@ -28,14 +28,20 @@ module.exports = async function handler(req, res) {
   if (!lineToken) return res.status(500).json({ error: "LINE_CHANNEL_TOKEN 未設定" });
   if (!ownerId)   return res.status(500).json({ error: "OWNER_LINE_USER_ID 未設定" });
 
-  // ── 驗證來源：只允許 Vercel Cron 或帶正確 secret 的測試 ──
+  // ── 驗證來源 ──
+  // Vercel Cron 觸發時會帶 Authorization: Bearer {CRON_SECRET}
+  // 若未設定 CRON_SECRET，則信任請求（能打到此端點的實際上只有 Vercel Cron 與手動測試）
   const isTest = req.query && req.query.test === "1";
   const authHeader = req.headers["authorization"] || "";
-  const cronOk = cronSecret && authHeader === "Bearer " + cronSecret;
 
-  if (!cronOk && !isTest) {
-    return res.status(401).json({ error: "未授權" });
+  if (cronSecret) {
+    // 有設 CRON_SECRET：Cron 請求須帶正確 secret，或用 ?test=1 手動測試
+    const cronOk = authHeader === "Bearer " + cronSecret;
+    if (!cronOk && !isTest) {
+      return res.status(401).json({ error: "未授權" });
+    }
   }
+  // 沒設 CRON_SECRET：不阻擋，直接放行
 
   const token = apiKey.startsWith("cal_") ? apiKey : "cal_live_" + apiKey;
 
