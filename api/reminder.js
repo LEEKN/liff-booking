@@ -23,19 +23,36 @@ module.exports = async function handler(req, res) {
   const lineToken  = process.env.LINE_CHANNEL_TOKEN;
   const ownerId    = process.env.OWNER_LINE_USER_ID;
   const cronSecret = process.env.CRON_SECRET;
+  const reminderKey = process.env.REMINDER_KEY;
 
   if (!apiKey)    return res.status(500).json({ error: "CAL_API_KEY 未設定" });
   if (!lineToken) return res.status(500).json({ error: "LINE_CHANNEL_TOKEN 未設定" });
   if (!ownerId)   return res.status(500).json({ error: "OWNER_LINE_USER_ID 未設定" });
 
-  // ── 驗證來源：只允許 Vercel Cron 或帶正確 secret 的測試 ──
+  // ── 驗證來源 ──
+  // 支援三種觸發方式：
+  //   1. 外部排程器（cron-job.org）：網址帶 ?key=你的密鑰
+  //   2. Vercel 內建 Cron：帶 Authorization: Bearer {CRON_SECRET}
+  //   3. 手動測試：帶 ?test=1（僅在未設 REMINDER_KEY 時可用）
+  const urlKey = req.query && req.query.key;
   const isTest = req.query && req.query.test === "1";
   const authHeader = req.headers["authorization"] || "";
-  const cronOk = cronSecret && authHeader === "Bearer " + cronSecret;
 
-  if (!cronOk && !isTest) {
-    return res.status(401).json({ error: "未授權" });
+  if (reminderKey) {
+    // 有設 REMINDER_KEY：網址密鑰正確，或 Vercel Cron secret 正確才放行
+    const keyOk = urlKey === reminderKey;
+    const cronOk = cronSecret && authHeader === "Bearer " + cronSecret;
+    if (!keyOk && !cronOk) {
+      return res.status(401).json({ error: "未授權" });
+    }
+  } else if (cronSecret) {
+    // 只設了 CRON_SECRET：Cron 請求須帶正確 secret，或用 ?test=1 手動測試
+    const cronOk = authHeader === "Bearer " + cronSecret;
+    if (!cronOk && !isTest) {
+      return res.status(401).json({ error: "未授權" });
+    }
   }
+  // 什麼都沒設：不阻擋（方便初期測試，但建議設定 REMINDER_KEY）
 
   const token = apiKey.startsWith("cal_") ? apiKey : "cal_live_" + apiKey;
 
