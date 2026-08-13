@@ -247,6 +247,63 @@
     }
     .plan-item.selected .plan-check { display: flex; }
     .plan-item.selected .plan-duration { display: none; }
+
+    /* ── 加購區塊 ── */
+    .addon-area {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--matcha-mid);
+    }
+    .addon-label {
+      font-size: 12px;
+      color: var(--ink-mid);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .addon-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--milk);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .addon-btn:last-child { margin-bottom: 0; }
+    .addon-btn:active { transform: scale(0.98); }
+    .addon-btn.selected {
+      border-color: var(--matcha);
+      background: var(--matcha-pale);
+      color: var(--matcha-dark);
+    }
+    .addon-btn-check {
+      width: 18px; height: 18px;
+      border-radius: 5px;
+      border: 1.5px solid var(--border);
+      background: white;
+      flex-shrink: 0;
+      position: relative;
+      transition: all 0.15s;
+    }
+    .addon-btn.selected .addon-btn-check {
+      background: var(--matcha);
+      border-color: var(--matcha);
+    }
+    .addon-btn.selected .addon-btn-check::after {
+      content: '';
+      position: absolute;
+      left: 5px; top: 2px;
+      width: 5px; height: 9px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
     .plan-check svg { width: 12px; height: 12px; }
 
     /* ══ 步驟二：日期與時段 ══ */
@@ -838,7 +895,11 @@ var state = {
   step: 1,
   lineUserId: "",
   eventTypes: [],
-  selectedPlan: null,        // { id, slug, title, length, description, realUsername }
+  mainPlans: [],             // 主服務（名稱不含 " and "）
+  addonMap: {},              // { 主服務title: [加購方案, ...] }
+  selectedPlan: null,        // 目前選定的方案（可能是主服務或組合方案）
+  selectedMainId: null,      // 目前選的主服務 id（UI 高亮用）
+  selectedAddonId: null,     // 目前選的加購 id（null = 未加購）
   realUsername: "",
   calendarYear: 0,
   calendarMonth: 0,          // 0-based
@@ -889,18 +950,92 @@ async function loadEventTypes() {
   if (state.eventTypes.length > 0 && state.eventTypes[0].realUsername) {
     state.realUsername = state.eventTypes[0].realUsername;
   }
+  parsePlans();
   renderPlanList();
 }
 
-/* ── 渲染方案列表 ── */
+/* ── 解析方案：分成主服務與加購 ──
+   命名規則：「主服務名 and 加購名」
+   - 名稱含 " and " → 加購方案，掛在對應主服務下
+   - 名稱不含 " and " → 主服務
+   - 若加購的主服務名找不到對應 → 當成一般主服務顯示（容錯）
+*/
+var ADDON_SEP = " and ";
+
+function parsePlans() {
+  var mains = [];
+  var addonCandidates = [];
+
+  state.eventTypes.forEach(function(et) {
+    if (et.title.indexOf(ADDON_SEP) !== -1) {
+      addonCandidates.push(et);
+    } else {
+      mains.push(et);
+    }
+  });
+
+  // 建立主服務名稱 → 主服務物件 的對照
+  var mainByTitle = {};
+  mains.forEach(function(m) { mainByTitle[m.title] = m; });
+
+  var addonMap = {};
+  addonCandidates.forEach(function(ad) {
+    var idx = ad.title.indexOf(ADDON_SEP);
+    var mainTitle = ad.title.substring(0, idx);
+    var addonName = ad.title.substring(idx + ADDON_SEP.length);
+
+    if (mainByTitle[mainTitle]) {
+      // 找到對應主服務 → 歸為加購
+      if (!addonMap[mainTitle]) addonMap[mainTitle] = [];
+      // 計算加購增加的時長
+      var extraMin = ad.length - mainByTitle[mainTitle].length;
+      addonMap[mainTitle].push({
+        id: ad.id,
+        slug: ad.slug,
+        title: ad.title,
+        length: ad.length,
+        addonName: addonName,      // 按鈕顯示文字
+        extraMin: extraMin > 0 ? extraMin : 0,
+        description: ad.description || "",
+        realUsername: ad.realUsername
+      });
+    } else {
+      // 找不到對應主服務 → 容錯，當成一般主服務
+      mains.push(ad);
+    }
+  });
+
+  state.mainPlans = mains;
+  state.addonMap = addonMap;
+}
+
+/* ── 渲染方案列表（只顯示主服務，有加購者長出加購按鈕）── */
 function renderPlanList() {
   var container = document.getElementById("plan-list");
-  if (!state.eventTypes.length) {
+  if (!state.mainPlans.length) {
     container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--ink-light);font-size:14px;">目前沒有可預約的方案</div>';
     return;
   }
-  container.innerHTML = state.eventTypes.map(function(et) {
-    return '<div class="plan-item" onclick="selectPlan(' + et.id + ')" id="plan-' + et.id + '">' +
+  container.innerHTML = state.mainPlans.map(function(et) {
+    var addons = state.addonMap[et.title] || [];
+
+    // 加購按鈕區塊
+    var addonHtml = "";
+    if (addons.length > 0) {
+      addonHtml = '<div class="addon-area" id="addon-area-' + et.id + '" style="display:none">' +
+        '<div class="addon-label">加購選項（可不選）</div>' +
+        addons.map(function(ad) {
+          var extraTxt = ad.extraMin > 0 ? " +" + ad.extraMin + "min" : "";
+          return '<div class="addon-btn" id="addon-' + ad.id + '" ' +
+                 'onclick="event.stopPropagation(); toggleAddon(' + et.id + ',' + ad.id + ')">' +
+                 '<span class="addon-btn-check"></span>' +
+                 '<span>+ ' + esc(ad.addonName) + extraTxt + '</span>' +
+                 '</div>';
+        }).join('') +
+      '</div>';
+    }
+
+    return '<div class="plan-item" onclick="selectMain(' + et.id + ')" id="plan-' + et.id + '">' +
       '<div class="plan-item-header">' +
         '<div class="plan-name">' + esc(et.title) + '</div>' +
         '<div class="plan-duration">' + et.length + ' 分鐘</div>' +
@@ -909,37 +1044,94 @@ function renderPlanList() {
         '</div>' +
       '</div>' +
       (et.description ? '<div class="plan-desc">' + esc(et.description) + '</div>' : '') +
+      addonHtml +
     '</div>';
   }).join('');
 }
 
-function selectPlan(id) {
-  var prevId = state.selectedPlan ? state.selectedPlan.id : null;
-  state.selectedPlan = state.eventTypes.find(function(e) { return e.id === id; });
+/* ── 選擇主服務 ── */
+function selectMain(mainId) {
+  var main = state.mainPlans.find(function(e) { return e.id === mainId; });
+  if (!main) return;
 
+  state.selectedMainId = mainId;
+  state.selectedAddonId = null;          // 切換主服務時清空加購
+  state.selectedPlan = main;             // 預設送出主服務本身
+
+  // UI：主服務高亮
   document.querySelectorAll('.plan-item').forEach(function(el) { el.classList.remove('selected'); });
-  document.getElementById('plan-' + id).classList.add('selected');
+  document.getElementById('plan-' + mainId).classList.add('selected');
 
-  // 清空日期與時段選擇
-  state.selectedDate = "";
-  state.selectedSlot = "";
-  state.selectedSlotIso = "";
-  state.slotsCache = {};  // 切換方案時清空快取
-  hide("slot-card");
+  // 清空所有加購按鈕的選取狀態
+  document.querySelectorAll('.addon-btn').forEach(function(el) { el.classList.remove('selected'); });
 
-  // 顯示日曆區塊（第一次選方案時）
+  // 顯示這個主服務的加購區（如果有），隱藏其他的
+  document.querySelectorAll('.addon-area').forEach(function(el) { el.style.display = "none"; });
+  var addonArea = document.getElementById('addon-area-' + mainId);
+  if (addonArea) addonArea.style.display = "block";
+
+  // 清空日期與時段
+  resetDateTime();
+
+  // 顯示日曆
   var calSection = document.getElementById("calendar-section");
   calSection.style.display = "block";
-
-  // 初始化日曆
   initCalendar();
-
-  // 滑動到日曆
   setTimeout(function() {
     calSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 100);
 
   updateNextBtn();
+}
+
+/* ── 切換加購（單選，再點一次取消）── */
+function toggleAddon(mainId, addonId) {
+  var addons = state.addonMap[
+    state.mainPlans.find(function(e) { return e.id === mainId; }).title
+  ] || [];
+  var addon = addons.find(function(a) { return a.id === addonId; });
+  if (!addon) return;
+
+  var main = state.mainPlans.find(function(e) { return e.id === mainId; });
+
+  if (state.selectedAddonId === addonId) {
+    // 再點一次 → 取消加購，回到主服務
+    state.selectedAddonId = null;
+    state.selectedPlan = main;
+    document.getElementById('addon-' + addonId).classList.remove('selected');
+  } else {
+    // 選加購 → 送出的方案切換成組合方案
+    state.selectedAddonId = addonId;
+    state.selectedPlan = addon;
+    // 單選：清掉同組其他加購的選取
+    document.querySelectorAll('#addon-area-' + mainId + ' .addon-btn').forEach(function(el) {
+      el.classList.remove('selected');
+    });
+    document.getElementById('addon-' + addonId).classList.add('selected');
+  }
+
+  // 加購改變 → 時長改變 → 清空並重抓時段
+  resetDateTime();
+  state.slotsCache = {};
+  initCalendar();
+  updateNextBtn();
+}
+
+/* ── 清空日期時段選擇 ── */
+function resetDateTime() {
+  state.selectedDate = "";
+  state.selectedSlot = "";
+  state.selectedSlotIso = "";
+  state.slotsCache = {};
+  hide("slot-card");
+}
+
+/* ── 方案名稱美化顯示：「主服務 and 加購」→「主服務 ＋ 加購」── */
+function prettyPlanTitle(title) {
+  if (title.indexOf(ADDON_SEP) !== -1) {
+    return title.replace(ADDON_SEP, " ＋ ");
+  }
+  return title;
 }
 
 /* ── 步驟導航 ── */
@@ -1169,7 +1361,7 @@ function renderSummary() {
   var weekNames = ["日","一","二","三","四","五","六"];
   var dateLabel = (d.getMonth()+1) + "/" + d.getDate() + "（週" + weekNames[d.getDay()] + "）" + state.selectedSlot;
 
-  document.getElementById("summary-plan").textContent = state.selectedPlan.title;
+  document.getElementById("summary-plan").textContent = prettyPlanTitle(state.selectedPlan.title);
   document.getElementById("summary-datetime").textContent = dateLabel;
   document.getElementById("summary-duration").textContent = state.selectedPlan.length + " 分鐘";
 }
@@ -1209,7 +1401,7 @@ async function submitBooking() {
     var weekNames = ["日","一","二","三","四","五","六"];
     var dateLabel = (d.getMonth()+1) + "/" + d.getDate() + "（週" + weekNames[d.getDay()] + "）" + state.selectedSlot;
 
-    document.getElementById("suc-plan").textContent = state.selectedPlan.title;
+    document.getElementById("suc-plan").textContent = prettyPlanTitle(state.selectedPlan.title);
     document.getElementById("suc-datetime").textContent = dateLabel;
     document.getElementById("suc-duration").textContent = state.selectedPlan.length + " 分鐘";
     document.getElementById("suc-name").textContent = name;
