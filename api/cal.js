@@ -28,17 +28,36 @@ function parseDescription(description) {
     .replace(/`/g, "");
 
   const marker = plain.indexOf("[加購]");
-  if (marker === -1) {
-    return { desc: plain.trim(), addons: [] };
+  const priceMarker = plain.indexOf("[價格]");
+
+  // 解析主服務價格
+  let basePrice = 0;
+  if (priceMarker !== -1) {
+    const afterPrice = plain.substring(priceMarker + "[價格]".length);
+    const priceMatch = afterPrice.match(/^\s*(\d+)/);
+    if (priceMatch) basePrice = parseInt(priceMatch[1], 10);
   }
 
-  const desc = plain.substring(0, marker).trim();
+  if (marker === -1) {
+    // 沒有加購，但可能有價格：把價格段從說明中移除
+    let descOnly = plain;
+    if (priceMarker !== -1) {
+      descOnly = plain.substring(0, priceMarker).trim();
+    }
+    return { desc: descOnly.trim(), addons: [], basePrice };
+  }
+
+  // 說明取到第一個標記（[價格] 或 [加購]）之前
+  const firstMarker = priceMarker !== -1 ? Math.min(priceMarker, marker) : marker;
+  const desc = plain.substring(0, firstMarker).trim();
   const addonBlock = plain.substring(marker + "[加購]".length);
 
   const addons = [];
   addonBlock.split("\n").forEach(line => {
     const t = line.trim();
     if (!t) return;
+    // 略過 [價格] 那行（若在加購後面）
+    if (t.indexOf("[價格]") !== -1) return;
     const parts = t.split("|");
     if (parts.length < 2) return;
 
@@ -56,7 +75,7 @@ function parseDescription(description) {
     });
   });
 
-  return { desc, addons };
+  return { desc, addons, basePrice };
 }
 
 module.exports = async function handler(req, res) {
@@ -123,6 +142,7 @@ module.exports = async function handler(req, res) {
               lengthOptions: et.lengthInMinutesOptions || null,
               description: parsed.desc,
               addons: parsed.addons,
+              basePrice: parsed.basePrice || 0,
               realUsername
             };
           });

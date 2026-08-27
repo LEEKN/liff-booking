@@ -248,6 +248,14 @@
     .plan-item.selected .plan-check { display: flex; }
     .plan-item.selected .plan-duration { display: none; }
 
+    .plan-price {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--matcha-dark);
+    }
+
     /* ── 加購區塊 ── */
     .addon-area {
       margin-top: 12px;
@@ -958,8 +966,22 @@ async function apiPost(body) {
   return data;
 }
 
-/* ── 初始化 ── */
-async function init() {
+/* ── 訪客點擊追蹤（fire-and-forget，不阻塞流程、失敗不影響預約）── */
+function trackClick(action, itemName, planName) {
+  try {
+    fetch((API_BASE || "") + "/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lineUserId: state.lineUserId || "",
+        action: action,
+        itemName: itemName || "",
+        planName: planName || ""
+      })
+    }).catch(function() {});   // 失敗靜默，不影響使用者
+  } catch (e) {}
+}
+
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) { liff.login(); return; }
   var profile = await liff.getProfile();
@@ -1008,7 +1030,7 @@ function renderPlanList() {
     var addonHtml = "";
     if (addons.length > 0) {
       addonHtml = '<div class="addon-area" id="addon-area-' + et.id + '" style="display:none">' +
-        '<div class="addon-label">加購選項（可複選）</div>' +
+        '<div class="addon-label">加購選項（可選一項）</div>' +
         addons.map(function(ad, idx) {
           var meta = "+" + ad.minutes + "min";
           if (ad.price > 0) meta += " +" + ad.price + "元";
@@ -1026,7 +1048,9 @@ function renderPlanList() {
 
     return '<div class="plan-item" onclick="selectPlan(' + et.id + ')" id="plan-' + et.id + '">' +
       '<div class="plan-item-header">' +
-        '<div class="plan-name">' + esc(et.title) + '</div>' +
+        '<div class="plan-name">' + esc(et.title) +
+          (et.basePrice > 0 ? '<span class="plan-price">' + et.basePrice + ' 元</span>' : '') +
+        '</div>' +
         '<div class="plan-duration">' + et.length + ' 分鐘</div>' +
         '<div class="plan-check">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
@@ -1045,6 +1069,9 @@ function selectPlan(id) {
 
   state.selectedPlan = plan;
   state.selectedAddons = [];   // 換方案時清空加購
+
+  // 追蹤：點方案
+  trackClick("方案", plan.title, "");
 
   // UI 高亮
   document.querySelectorAll('.plan-item').forEach(function(el) { el.classList.remove('selected'); });
@@ -1069,22 +1096,29 @@ function selectPlan(id) {
   updateNextBtn();
 }
 
-/* ── 勾選 / 取消加購（可複選）── */
+/* ── 選擇 / 取消加購（單選，再點一次取消）── */
 function toggleAddon(planId, addonIdx) {
   var plan = state.eventTypes.find(function(e) { return e.id === planId; });
   if (!plan || !plan.addons || !plan.addons[addonIdx]) return;
   var addon = plan.addons[addonIdx];
 
   var btn = document.getElementById('addon-' + planId + '-' + addonIdx);
-  var pos = state.selectedAddons.findIndex(function(a) { return a.name === addon.name; });
+  var already = state.selectedAddons.length > 0 && state.selectedAddons[0].name === addon.name;
 
-  if (pos !== -1) {
-    state.selectedAddons.splice(pos, 1);
-    btn.classList.remove('selected');
-  } else {
-    state.selectedAddons.push(addon);
+  // 先清空目前選取（單選：一次只能有一個加購）
+  state.selectedAddons = [];
+  document.querySelectorAll('#addon-area-' + planId + ' .addon-btn').forEach(function(el) {
+    el.classList.remove('selected');
+  });
+
+  if (!already) {
+    // 選這個加購
+    state.selectedAddons = [addon];
     btn.classList.add('selected');
+    // 追蹤：點加購（取消時不記）
+    trackClick("加購", addon.name, plan.title);
   }
+  // 若 already 為真（再點同一個）→ 保持清空 = 取消加購
 
   updateAddonSummary();
 
@@ -1104,10 +1138,14 @@ function updateAddonSummary() {
   if (!totalEl) return;
 
   var totalMin = getTotalMinutes();
+  var totalPrice = getTotalPrice();
   var extraPrice = state.selectedAddons.reduce(function(s, a) { return s + (a.price || 0); }, 0);
 
   var txt = '總時長 ' + totalMin + ' 分鐘';
-  if (extraPrice > 0) txt += '　加購金額 +' + extraPrice + ' 元';
+  if (totalPrice > 0) {
+    txt += '　總價 ' + totalPrice + ' 元';
+    if (extraPrice > 0) txt += '（含加購 +' + extraPrice + '）';
+  }
   totalEl.textContent = txt;
 
   // 顯示有備註的加購提醒
@@ -1127,6 +1165,13 @@ function getTotalMinutes() {
   if (!state.selectedPlan) return 0;
   var base = state.selectedPlan.length || 0;
   var extra = state.selectedAddons.reduce(function(s, a) { return s + (a.minutes || 0); }, 0);
+  return base + extra;}
+
+/* ── 目前選擇的總價（主服務原價 + 所有加購加價）── */
+function getTotalPrice() {
+  if (!state.selectedPlan) return 0;
+  var base = state.selectedPlan.basePrice || 0;
+  var extra = state.selectedAddons.reduce(function(s, a) { return s + (a.price || 0); }, 0);
   return base + extra;
 }
 
@@ -1383,7 +1428,10 @@ function renderSummary() {
 
   document.getElementById("summary-plan").textContent = planTxt;
   document.getElementById("summary-datetime").textContent = dateLabel;
-  document.getElementById("summary-duration").textContent = getTotalMinutes() + " 分鐘";
+  var sumDur = getTotalMinutes() + " 分鐘";
+  var sumPrice = getTotalPrice();
+  if (sumPrice > 0) sumDur += "　" + sumPrice + " 元";
+  document.getElementById("summary-duration").textContent = sumDur;
 }
 
 /* ── 送出預約 ── */
@@ -1439,7 +1487,10 @@ async function submitBooking() {
 
     document.getElementById("suc-plan").textContent = sucPlanTxt;
     document.getElementById("suc-datetime").textContent = dateLabel;
-    document.getElementById("suc-duration").textContent = getTotalMinutes() + " 分鐘";
+    var sucDur = getTotalMinutes() + " 分鐘";
+    var sucPrice = getTotalPrice();
+    if (sucPrice > 0) sucDur += "　" + sucPrice + " 元";
+    document.getElementById("suc-duration").textContent = sucDur;
     document.getElementById("suc-name").textContent = name;
 
     hide("screen-booking");
