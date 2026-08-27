@@ -107,7 +107,12 @@ module.exports = async function handler(req, res) {
           .filter(et => {
             if (et.hidden) return false;
             const slug = (et.slug || "").toLowerCase();
-            return !slug.includes("checking") && !slug.includes("test");
+            const title = et.title || "";
+            // 過濾測試方案與設定用方案（通知模板）
+            if (slug.includes("checking") || slug.includes("test")) return false;
+            if (slug.includes("notify-template") || title.indexOf("通知模板") !== -1) return false;
+            if (title.indexOf("_設定") === 0) return false;
+            return true;
           })
           .map(et => {
             const parsed = parseDescription(et.description || "");
@@ -122,6 +127,55 @@ module.exports = async function handler(req, res) {
           });
 
         return res.status(200).json({ eventTypes });
+      }
+
+      // ── 設定方案的可選時長（繞過網頁下拉選單的預設清單限制）──
+      // 用法：/api/cal?action=setDurations&eventTypeId=123&durations=60,70,90,100&key=你的REMINDER_KEY
+      if (action === "setDurations") {
+        const adminKey = process.env.REMINDER_KEY;
+        if (!adminKey || req.query.key !== adminKey) {
+          return res.status(401).json({ error: "未授權：需帶正確的 key 參數" });
+        }
+        if (!eventTypeId || !req.query.durations) {
+          return res.status(400).json({ error: "缺少參數：eventTypeId, durations" });
+        }
+
+        const list = String(req.query.durations)
+          .split(",")
+          .map(s => parseInt(s.trim(), 10))
+          .filter(n => !isNaN(n) && n > 0);
+
+        if (!list.length) {
+          return res.status(400).json({ error: "durations 格式錯誤，範例：60,70,90,100" });
+        }
+
+        // 預設時長：取最小值（等於未加購的原始時長）
+        const defaultLen = Math.min.apply(null, list);
+
+        const r = await fetch(CAL_API_BASE + "/event-types/" + encodeURIComponent(eventTypeId), {
+          method: "PATCH",
+          headers: {
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json",
+            "cal-api-version": "2024-06-14"
+          },
+          body: JSON.stringify({
+            lengthInMinutes: defaultLen,
+            lengthInMinutesOptions: list
+          })
+        });
+
+        const data = await r.json();
+        if (!r.ok) {
+          return res.status(r.status).json({ error: "設定失敗", detail: data });
+        }
+        return res.status(200).json({
+          ok: true,
+          eventTypeId: Number(eventTypeId),
+          defaultLength: defaultLen,
+          options: list,
+          message: "已設定可選時長"
+        });
       }
 
       // 取得時段（2024-09-04 版本，用 eventTypeId + start/end）

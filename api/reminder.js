@@ -14,12 +14,13 @@
  * 也可手動測試：GET https://你的vercel網址/api/reminder?test=1
  */
 
-const { pushLine, toTaiwanTime, extractBooking } = require("./_line");
+const { pushLine, toTaiwanTime, extractBooking, loadTemplates, renderTemplate } = require("./_line");
 
 const CAL_API_BASE = "https://api.cal.com/v2";
 
 module.exports = async function handler(req, res) {
   const apiKey     = process.env.CAL_API_KEY;
+  const calUsername = process.env.CAL_USERNAME;
   const lineToken  = process.env.LINE_CHANNEL_TOKEN;
   const ownerId    = process.env.OWNER_LINE_USER_ID;
   const cronSecret = process.env.CRON_SECRET;
@@ -127,24 +128,35 @@ module.exports = async function handler(req, res) {
       return { ...info, tw };
     });
 
+    // 讀取自訂模板（讀不到用內建預設）
+    let templates = null;
+    if (apiKey && calUsername) {
+      templates = await loadTemplates(apiKey, calUsername);
+    }
+
     // ── 1. 逐筆提醒客人 ──
     let customerSent = 0;
     for (const bk of parsed) {
       if (!bk.lineUserId) continue;
 
       const timeStr = bk.tw ? bk.tw.full : "（時間未知）";
-      const msg =
-        "🔔 預約提醒\n" +
-        "\n" +
-        "提醒您明天的預約：\n" +
-        "\n" +
-        "📋 " + bk.title + "\n" +
+
+      const vars = {
+        "方案": bk.title,
+        "加購": bk.addons ? "➕ 加購：" + bk.addons : "",
+        "時間": timeStr,
+        "時長": (bk.length || "?")
+      };
+
+      const defaultMsg =
+        "🔔 預約提醒\n\n提醒您明天的預約：\n\n📋 " + bk.title + "\n" +
         (bk.addons ? "➕ 加購：" + bk.addons + "\n" : "") +
-        "📅 " + timeStr + "\n" +
-        "⏱ " + (bk.length || "?") + " 分鐘\n" +
-        "\n" +
-        "期待為您服務 💆\n" +
-        "如需取消或改期，請直接回覆訊息。";
+        "📅 " + timeStr + "\n⏱ " + (bk.length || "?") + " 分鐘\n\n" +
+        "期待為您服務 💆\n如需取消或改期，請直接回覆訊息。";
+
+      const msg = (templates && templates["提醒-客人"])
+        ? renderTemplate(templates["提醒-客人"], vars)
+        : defaultMsg;
 
       const result = await pushLine(bk.lineUserId, msg, lineToken);
       if (result.ok) customerSent++;

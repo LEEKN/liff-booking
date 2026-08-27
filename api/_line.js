@@ -6,6 +6,115 @@
 
 const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 
+const CAL_API_BASE_FOR_TPL = "https://api.cal.com/v2";
+
+/**
+ * 讀取通知訊息模板
+ *
+ * 模板存放：Cal.com 一個隱藏方案，slug 含 "notify-template" 或名稱含 "_設定_通知模板"
+ * 該方案的 Description 用區塊格式：
+ *
+ *   [新預約-店主]
+ *   🔔 新預約通知
+ *   📋 {方案}
+ *   ...
+ *
+ *   [預約確認-客人]
+ *   ...
+ *
+ * 回傳 { "新預約-店主": "...", "預約確認-客人": "...", ... }
+ * 讀取失敗回傳 null（呼叫端會改用內建預設）
+ */
+async function loadTemplates(calApiKey, calUsername) {
+  try {
+    const token = calApiKey.startsWith("cal_") ? calApiKey : "cal_live_" + calApiKey;
+    const r = await fetch(
+      CAL_API_BASE_FOR_TPL + "/event-types?username=" + encodeURIComponent(calUsername),
+      { headers: { "Authorization": "Bearer " + token, "cal-api-version": "2024-06-14" } }
+    );
+    if (!r.ok) return null;
+    const data = await r.json();
+
+    let list = [];
+    if (Array.isArray(data.data)) list = data.data;
+    else if (data.data && Array.isArray(data.data.eventTypeGroups))
+      list = data.data.eventTypeGroups.flatMap(g => g.eventTypes || []);
+
+    // 找模板方案：slug 含 notify-template 或 title 含 通知模板
+    const tpl = list.find(et => {
+      const slug = (et.slug || "").toLowerCase();
+      const title = et.title || "";
+      return slug.indexOf("notify-template") !== -1 || title.indexOf("通知模板") !== -1;
+    });
+
+    if (!tpl || !tpl.description) return null;
+    return parseTemplateBlocks(tpl.description);
+  } catch (err) {
+    console.error("讀取模板失敗:", err.message);
+    return null;
+  }
+}
+
+/**
+ * 解析模板 Description 成區塊
+ * [區塊名] 以下到下一個 [ 之前的內容為該區塊
+ */
+function parseTemplateBlocks(description) {
+  // 去 HTML
+  const plain = description
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ");
+
+  const blocks = {};
+  // 用 [區塊名] 切分
+  const re = /\[([^\]]+)\]/g;
+  let matches = [];
+  let m;
+  while ((m = re.exec(plain)) !== null) {
+    matches.push({ name: m[1].trim(), start: m.index, contentStart: m.index + m[0].length });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const next = matches[i + 1];
+    const end = next ? next.start : plain.length;
+    const content = plain.substring(cur.contentStart, end).replace(/^\n+|\n+$/g, "");
+    blocks[cur.name] = content;
+  }
+
+  return Object.keys(blocks).length ? blocks : null;
+}
+
+/**
+ * 把模板字串裡的 {變數} 代入實際值
+ * vars 例：{ 方案:"經典指壓", 時間:"6/1 14:00", 加購:"牛角加強", ... }
+ * 特殊處理：{加購} 若為空，該行整行移除（避免留下空的「➕ 加購：」）
+ */
+function renderTemplate(tpl, vars) {
+  let text = tpl;
+
+  // 先處理「加購」這種可能為空、要整行移除的變數
+  const lineRemoveIfEmpty = ["加購", "備註", "提醒"];
+  text = text.split("\n").filter(line => {
+    for (const key of lineRemoveIfEmpty) {
+      if (line.indexOf("{" + key + "}") !== -1) {
+        // 該行含這個變數，若值為空則移除整行
+        if (!vars[key]) return false;
+      }
+    }
+    return true;
+  }).join("\n");
+
+  // 代入所有變數
+  Object.keys(vars).forEach(function(key) {
+    var val = vars[key] == null ? "" : String(vars[key]);
+    text = text.split("{" + key + "}").join(val);
+  });
+
+  return text;
+}
+
 /**
  * 推播 LINE 訊息給指定對象
  * @param {string} to       - 對象的 LINE User ID
@@ -112,4 +221,4 @@ function extractBooking(bk) {
   return { title, startTime, length, name, lineUserId, phone, addons };
 }
 
-module.exports = { pushLine, toTaiwanTime, extractBooking };
+module.exports = { pushLine, toTaiwanTime, extractBooking, loadTemplates, renderTemplate };
