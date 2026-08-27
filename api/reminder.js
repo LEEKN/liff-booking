@@ -139,6 +139,7 @@ module.exports = async function handler(req, res) {
         "提醒您明天的預約：\n" +
         "\n" +
         "📋 " + bk.title + "\n" +
+        (bk.addons ? "➕ 加購：" + bk.addons + "\n" : "") +
         "📅 " + timeStr + "\n" +
         "⏱ " + (bk.length || "?") + " 分鐘\n" +
         "\n" +

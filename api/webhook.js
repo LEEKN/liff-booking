@@ -61,10 +61,13 @@ module.exports = async function handler(req, res) {
     const timeStr = tw ? tw.full : "（時間未知）";
 
     // ── 1. 通知店主 ──
+    const addonLine = bk.addons ? "➕ 加購：" + bk.addons + "\n" : "";
+
     const ownerMsg =
       "🔔 新預約通知\n" +
       "\n" +
       "📋 " + bk.title + "\n" +
+      addonLine +
       "📅 " + timeStr + "\n" +
       "⏱ " + (bk.length || "?") + " 分鐘\n" +
       "👤 " + (bk.name || "未提供") + "\n" +
@@ -81,6 +84,7 @@ module.exports = async function handler(req, res) {
         "感謝您的預約！\n" +
         "\n" +
         "📋 " + bk.title + "\n" +
+        addonLine +
         "📅 " + timeStr + "\n" +
         "⏱ " + (bk.length || "?") + " 分鐘\n" +
         "\n" +

@@ -105,7 +105,11 @@ function extractBooking(bk) {
   else if (bk.responses?.attendeePhoneNumber?.value) phone = bk.responses.attendeePhoneNumber.value;
   else if (bk.bookingFieldsResponses?.attendeePhoneNumber) phone = bk.bookingFieldsResponses.attendeePhoneNumber;
 
-  return { title, startTime, length, name, lineUserId, phone };
+  // 加購資訊（建立預約時寫進 metadata）
+  let addons = "";
+  if (bk.metadata && bk.metadata.addons) addons = bk.metadata.addons;
+
+  return { title, startTime, length, name, lineUserId, phone, addons };
 }
 
 module.exports = { pushLine, toTaiwanTime, extractBooking };

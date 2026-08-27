@@ -5,6 +5,59 @@
 
 const CAL_API_BASE = "https://api.cal.com/v2";
 
+/**
+ * 解析 Event Type 的 Description，分離「服務說明」與「加購清單」
+ *
+ * 格式範例：
+ *   針對肌肉的緊繃與僵硬，進行大面積的放鬆處理。
+ *
+ *   [加購]
+ *   牛角加強|30|700|請於現場告知加強部位
+ *   牛角眼額|10|200|
+ *
+ * 回傳 { desc: "服務說明", addons: [{name, minutes, price, note}] }
+ */
+function parseDescription(description) {
+  if (!description) return { desc: "", addons: [] };
+
+  // 去除 HTML 標籤（Cal.com 的 description 可能含 <br> 等）
+  const plain = description
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ");
+
+  const marker = plain.indexOf("[加購]");
+  if (marker === -1) {
+    return { desc: plain.trim(), addons: [] };
+  }
+
+  const desc = plain.substring(0, marker).trim();
+  const addonBlock = plain.substring(marker + "[加購]".length);
+
+  const addons = [];
+  addonBlock.split("\n").forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+    const parts = t.split("|");
+    if (parts.length < 2) return;
+
+    const name = (parts[0] || "").trim();
+    const minutes = parseInt((parts[1] || "0").trim(), 10);
+    const price = parseInt((parts[2] || "0").trim(), 10);
+    const note = (parts[3] || "").trim();
+
+    if (!name || isNaN(minutes)) return;
+    addons.push({
+      name,
+      minutes: minutes,
+      price: isNaN(price) ? 0 : price,
+      note
+    });
+  });
+
+  return { desc, addons };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -56,24 +109,36 @@ module.exports = async function handler(req, res) {
             const slug = (et.slug || "").toLowerCase();
             return !slug.includes("checking") && !slug.includes("test");
           })
-          .map(et => ({
-            id: et.id, slug: et.slug, title: et.title,
-            length: et.length || et.lengthInMinutes,
-            description: et.description || "", realUsername
-          }));
+          .map(et => {
+            const parsed = parseDescription(et.description || "");
+            return {
+              id: et.id, slug: et.slug, title: et.title,
+              length: et.length || et.lengthInMinutes,
+              lengthOptions: et.lengthInMinutesOptions || null,
+              description: parsed.desc,
+              addons: parsed.addons,
+              realUsername
+            };
+          });
 
         return res.status(200).json({ eventTypes });
       }
 
       // 取得時段（2024-09-04 版本，用 eventTypeId + start/end）
+      // duration：可變時長方案指定本次要查的總時長（含加購）
       if (action === "slots") {
         if (!eventTypeId || !startTime || !endTime)
           return res.status(400).json({ error: "缺少參數" });
 
-        const url = CAL_API_BASE + "/slots"
+        let url = CAL_API_BASE + "/slots"
           + "?eventTypeId=" + encodeURIComponent(eventTypeId)
           + "&start=" + encodeURIComponent(startTime)
           + "&end=" + encodeURIComponent(endTime);
+
+        // 有指定時長就帶上（可變時長 event type 用）
+        if (req.query.duration) {
+          url += "&duration=" + encodeURIComponent(req.query.duration);
+        }
 
         const r = await fetch(url, {
           headers: { "Authorization": "Bearer " + token, "cal-api-version": "2024-09-04" }
@@ -102,6 +167,19 @@ module.exports = async function handler(req, res) {
           language: "zh-TW"
         }
       };
+
+      // 可變時長：加購後的總時長
+      if (body.lengthInMinutes) {
+        payload.lengthInMinutes = Number(body.lengthInMinutes);
+      }
+
+      // 加購資訊寫進 metadata，供通知訊息使用
+      if (body.addons) {
+        payload.metadata.addons = String(body.addons).slice(0, 500);
+      }
+      if (body.totalPrice) {
+        payload.metadata.totalPrice = String(body.totalPrice);
+      }
 
       // 電話號碼轉國際格式（09xxxxxxxx → +8869xxxxxxxx）
       if (body.phone) {
