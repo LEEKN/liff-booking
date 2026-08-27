@@ -20,11 +20,12 @@ const CAL_API_BASE = "https://api.cal.com/v2";
 function parseDescription(description) {
   if (!description) return { desc: "", addons: [] };
 
-  // 去除 HTML 標籤（Cal.com 的 description 可能含 <br> 等）
+  // 去除 HTML 標籤與 Markdown 反引號
   const plain = description
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/`/g, "");
 
   const marker = plain.indexOf("[加購]");
   if (marker === -1) {

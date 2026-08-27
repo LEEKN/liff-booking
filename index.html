@@ -1064,9 +1064,7 @@ function selectPlan(id) {
   var calSection = document.getElementById("calendar-section");
   calSection.style.display = "block";
   initCalendar();
-  setTimeout(function() {
-    calSection.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 100);
+  // 不自動捲動：讓顧客自行決定是否加購、確認選擇
 
   updateNextBtn();
 }
@@ -1291,13 +1289,18 @@ async function fetchMonthSlots(yr, mo) {
   var endTime   = new Date(yr, mo + 1, 0, 23, 59, 59).toISOString();
 
   try {
-    var data = await apiGet({
+    var slotQuery = {
       action: "slots",
       eventTypeId: state.selectedPlan.id,
-      duration: getTotalMinutes(),
       startTime: startTime,
       endTime: endTime
-    });
+    };
+    // 有加購才帶 duration（沒加購用方案原始時長，不需指定）
+    var totalMin = getTotalMinutes();
+    if (state.selectedAddons.length > 0 && totalMin !== state.selectedPlan.length) {
+      slotQuery.duration = totalMin;
+    }
+    var data = await apiGet(slotQuery);
 
     // Cal.com v2 slots 回傳格式：{ data: { "YYYY-MM-DD": [{start: ISO},...] }, status: "success" }
     var raw = (data.data && typeof data.data === "object") ? data.data : (data.slots || {});
@@ -1399,9 +1402,12 @@ async function submitBooking() {
 
   try {
     // Cal.com API 的 email 為必填，若顧客未填則用手機號碼產生虛擬 email
-    var emailToSend = email || (phone.replace(/[^0-9]/g, "") + "@noemail.local");
+    var emailToSend = email || (phone.replace(/[^0-9]/g, "") + "@example.com");
 
-    var result = await apiPost({
+    // 只有選了加購（總時長 ≠ 原始時長）才送 lengthInMinutes
+    // 沒加購的方案若送此欄位，Cal.com 會因「非多時長方案」拒絕
+    var totalMin = getTotalMinutes();
+    var bookingData = {
       action: "createBooking",
       eventTypeId: state.selectedPlan.id,
       startTime: state.selectedSlotIso,
@@ -1411,10 +1417,16 @@ async function submitBooking() {
       lineUserId: state.lineUserId,
       timeZone: "Asia/Taipei",
       language: "zh-TW",
-      lengthInMinutes: getTotalMinutes(),
       addons: getAddonNames(),
       totalPrice: state.selectedAddons.reduce(function(s, a) { return s + (a.price || 0); }, 0)
-    });
+    };
+
+    // 有加購才帶時長（總時長大於原始時長時）
+    if (state.selectedAddons.length > 0 && totalMin !== state.selectedPlan.length) {
+      bookingData.lengthInMinutes = totalMin;
+    }
+
+    var result = await apiPost(bookingData);
 
     // 顯示成功畫面
     var d = new Date(state.selectedDate + "T00:00:00");
