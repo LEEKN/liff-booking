@@ -1118,10 +1118,13 @@ function toggleAddon(planId, addonIdx) {
     // 選這個加購
     state.selectedAddons = [addon];
     btn.classList.add('selected');
-    // 追蹤：點加購（取消時不記）
+    // 追蹤：點加購
     trackClick("加購", addon.name, plan.title);
+  } else {
+    // 再點同一個 → 取消加購，也記錄一筆
+    trackClick("取消加購", addon.name, plan.title);
   }
-  // 若 already 為真（再點同一個）→ 保持清空 = 取消加購
+  // already 為真（再點同一個）→ 保持清空 = 取消加購
 
   updateAddonSummary();
 
