@@ -982,10 +982,13 @@ function trackClick(action, itemName, planName) {
   } catch (e) {}
 }
 
+/* ── 初始化 ── */
+async function init() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) { liff.login(); return; }
   var profile = await liff.getProfile();
   state.lineUserId = profile.userId;
+  trackClick("進入", "", "");   // ← 記錄進站
   await loadEventTypes();
   show("screen-booking");
   hide("screen-loading");
