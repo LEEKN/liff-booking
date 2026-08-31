@@ -24,6 +24,8 @@ module.exports = async function handler(req, res) {
   const lineToken   = process.env.LINE_CHANNEL_TOKEN;
   const ownerId     = process.env.OWNER_LINE_USER_ID;
   const webhookSecret = process.env.CAL_WEBHOOK_SECRET;
+  // 商家通知改用另一個 bot 的 token（減少官方帳號訊息量）；未設定時退回官方帳號 token
+  const ownerToken  = process.env.OWNER_LINE_CHANNEL_TOKEN || lineToken;
 
   if (!lineToken) return res.status(500).json({ error: "LINE_CHANNEL_TOKEN 未設定" });
   if (!ownerId)   return res.status(500).json({ error: "OWNER_LINE_USER_ID 未設定" });
@@ -92,7 +94,7 @@ module.exports = async function handler(req, res) {
       ? renderTemplate(templates["新預約-店主"], vars)
       : defaultOwner;
 
-    const ownerResult = await pushLine(ownerId, ownerMsg, lineToken);
+    const ownerResult = await pushLine(ownerId, ownerMsg, ownerToken);
 
     // ── 2. 通知客人（如果有 lineUserId）──
     let customerResult = { ok: false, body: "無 lineUserId" };
