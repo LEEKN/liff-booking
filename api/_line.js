@@ -65,7 +65,9 @@ function parseTemplateBlocks(description) {
   const plain = description
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/\\\[/g, "[")
+    .replace(/\\\]/g, "]");
 
   const blocks = {};
   // 用 [區塊名] 切分
@@ -73,7 +75,7 @@ function parseTemplateBlocks(description) {
   let matches = [];
   let m;
   while ((m = re.exec(plain)) !== null) {
-    matches.push({ name: m[1].trim(), start: m.index, contentStart: m.index + m[0].length });
+    matches.push({ name: m[1].trim().replace(/\\/g, ""), start: m.index, contentStart: m.index + m[0].length });
   }
 
   for (let i = 0; i < matches.length; i++) {
