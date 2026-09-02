@@ -107,13 +107,17 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ status: r.status, raw: await r.json() });
       }
 
-      // debugTemplate：檢查通知模板有沒有被讀到、讀到哪些區塊
+      // debugTemplate：檢查通知模板是否讀到、並直接驗證 webhook/reminder 實際用的鍵能不能取到
       // 用法：/api/cal?action=debugTemplate
       if (action === "debugTemplate") {
         const templates = await loadTemplates(apiKey, calUsername);
+        const usedKeys = ["新預約-店主", "預約確認-客人", "提醒-客人"];
+        const keyResolved = {};
+        usedKeys.forEach(function(k) { keyResolved[k] = !!(templates && templates[k]); });
         return res.status(200).json({
           found: !!templates,
           blocks: templates ? Object.keys(templates) : [],
+          keyResolved: keyResolved,
           templates: templates || null
         });
       }
