@@ -225,10 +225,10 @@ function extractBooking(bk) {
   let note = "";
   if (bk.metadata && bk.metadata.note) note = bk.metadata.note;
 
-  // 客人 email
+  // 客人 email：只取建立預約時存的 customerEmail（客人真正填的）
+  // fallback 店家信箱不會存進這裡，所以不會誤顯示
   let email = "";
-  if (bk.attendees && bk.attendees[0] && bk.attendees[0].email) email = bk.attendees[0].email;
-  else if (bk.responses && bk.responses.email && bk.responses.email.value) email = bk.responses.email.value;
+  if (bk.metadata && bk.metadata.customerEmail) email = bk.metadata.customerEmail;
 
   return { title, startTime, length, name, lineUserId, phone, addons, note, email };
 }

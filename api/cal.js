@@ -275,6 +275,10 @@ module.exports = async function handler(req, res) {
       if (body.note) {
         payload.metadata.note = String(body.note).slice(0, 500);
       }
+      // 客人有填 email 才存進 metadata（fallback 店家信箱不存，通知就不會顯示到店家信箱）
+      if (body.email && String(body.email).trim()) {
+        payload.metadata.customerEmail = String(body.email).trim().slice(0, 200);
+      }
       // 加購資訊寫進 metadata，供通知訊息使用
       if (body.addons) {
         payload.metadata.addons = String(body.addons).slice(0, 500);

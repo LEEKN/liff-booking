@@ -76,13 +76,13 @@ module.exports = async function handler(req, res) {
       "姓名": bk.name || "未提供",
       "電話": bk.phone || "未提供",
       "備註": bk.note || "",
-      "信箱": (bk.email && !bk.email.includes("FALLBACK") && bk.email !== (process.env.FALLBACK_EMAIL || "")) ? bk.email : ""
+      "信箱": bk.email || ""
     };
 
     // 內建預設訊息（模板讀不到時的後備）
     const addonLine = bk.addons ? "➕ 加購：" + bk.addons + "\n" : "";
     const noteLine = bk.note ? "📝 備註：" + bk.note + "\n" : "";
-    const emailLine = (bk.email && bk.email !== (process.env.FALLBACK_EMAIL || "")) ? "✉️ Email：" + bk.email + "\n" : "";
+    const emailLine = bk.email ? "✉️ Email：" + bk.email + "\n" : "";
     const defaultOwner =
       "🔔 新預約通知\n\n📋 " + bk.title + "\n" + addonLine +
       "📅 " + timeStr + "\n⏱ " + (bk.length || "?") + " 分鐘\n" +
