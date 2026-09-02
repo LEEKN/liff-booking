@@ -147,7 +147,8 @@ module.exports = async function handler(req, res) {
         "方案": bk.title,
         "加購": bk.addons ? "➕ 加購：" + bk.addons : "",
         "時間": timeStr,
-        "時長": (bk.length || "?")
+        "時長": (bk.length || "?"),
+        "姓名": bk.name || "未提供"
       };
 
       const defaultMsg =

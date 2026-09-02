@@ -6,7 +6,7 @@
  *   TRACK_WEBHOOK_URL   Google Apps Script 發布的 Web App 網址
  *
  * 前端呼叫方式（POST）：
- *   { lineUserId, action: "方案"|"加購", itemName, planName }
+ *   { lineUserId, sessionId, action: "進入"|"方案"|"加購"|"取消加購", itemName, planName }
  */
 
 module.exports = async function handler(req, res) {
@@ -40,6 +40,7 @@ module.exports = async function handler(req, res) {
 
     const record = {
       time: timeStr,
+      sessionId: body.sessionId || "",   // 同一次造訪的識別碼（前端每次進站產生一組）
       lineUserId: body.lineUserId || "",
       action: body.action || "",       // "方案" 或 "加購"
       itemName: body.itemName || "",    // 點的方案名 或 加購名

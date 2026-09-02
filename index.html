@@ -974,6 +974,7 @@ function trackClick(action, itemName, planName) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lineUserId: state.lineUserId || "",
+        sessionId: state.sessionId || "",
         action: action,
         itemName: itemName || "",
         planName: planName || ""
@@ -988,7 +989,11 @@ async function init() {
   if (!liff.isLoggedIn()) { liff.login(); return; }
   var profile = await liff.getProfile();
   state.lineUserId = profile.userId;
-  trackClick("進入", "", "");   // ← 記錄進站
+  // 產生本次造訪的 session id：標記同一次進站的所有動作，也讓一小時後的再次造訪成為另一筆 session
+  state.sessionId = (self.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10));
+  trackClick("進入", "", "");   // 記錄進站
   await loadEventTypes();
   show("screen-booking");
   hide("screen-loading");
