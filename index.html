@@ -989,11 +989,10 @@ async function init() {
   if (!liff.isLoggedIn()) { liff.login(); return; }
   var profile = await liff.getProfile();
   state.lineUserId = profile.userId;
-  // 產生本次造訪的 session id：標記同一次進站的所有動作，也讓一小時後的再次造訪成為另一筆 session
   state.sessionId = (self.crypto && crypto.randomUUID)
     ? crypto.randomUUID()
     : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10));
-  trackClick("進入", "", "");   // 記錄進站
+  trackClick("進入", "", "");
   await loadEventTypes();
   show("screen-booking");
   hide("screen-loading");
@@ -1126,7 +1125,6 @@ function toggleAddon(planId, addonIdx) {
     // 追蹤：點加購
     trackClick("加購", addon.name, plan.title);
   } else {
-    // 再點同一個 → 取消加購，也記錄一筆
     trackClick("取消加購", addon.name, plan.title);
   }
   // already 為真（再點同一個）→ 保持清空 = 取消加購
@@ -1460,9 +1458,7 @@ async function submitBooking() {
   btn.disabled = true;
 
   try {
-    // email 顧客可不填；空著時交給後端 cal.js 用 FALLBACK_EMAIL（店家自己的信箱）補上
-    // 不在前端自造假 email：Cal.com 會驗證網域能不能收信，@example.com / @sms.cal.com 都會被擋
-    var emailToSend = email;   // 可能為空字串，由後端處理
+    var emailToSend = email;
 
     // 只有選了加購（總時長 ≠ 原始時長）才送 lengthInMinutes
     // 沒加購的方案若送此欄位，Cal.com 會因「非多時長方案」拒絕
@@ -1474,6 +1470,7 @@ async function submitBooking() {
       name: name,
       email: emailToSend,
       phone: phone || undefined,
+      note: document.getElementById("input-note").value.trim() || undefined,
       lineUserId: state.lineUserId,
       timeZone: "Asia/Taipei",
       language: "zh-TW",

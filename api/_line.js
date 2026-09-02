@@ -221,7 +221,11 @@ function extractBooking(bk) {
   let addons = "";
   if (bk.metadata && bk.metadata.addons) addons = bk.metadata.addons;
 
-  return { title, startTime, length, name, lineUserId, phone, addons };
+  // 備註（建立預約時寫進 metadata）
+  let note = "";
+  if (bk.metadata && bk.metadata.note) note = bk.metadata.note;
+
+  return { title, startTime, length, name, lineUserId, phone, addons, note };
 }
 
 module.exports = { pushLine, toTaiwanTime, extractBooking, loadTemplates, renderTemplate };

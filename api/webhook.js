@@ -24,7 +24,6 @@ module.exports = async function handler(req, res) {
   const lineToken   = process.env.LINE_CHANNEL_TOKEN;
   const ownerId     = process.env.OWNER_LINE_USER_ID;
   const webhookSecret = process.env.CAL_WEBHOOK_SECRET;
-  // 商家通知改用另一個 bot 的 token（減少官方帳號訊息量）；未設定時退回官方帳號 token
   const ownerToken  = process.env.OWNER_LINE_CHANNEL_TOKEN || lineToken;
 
   if (!lineToken) return res.status(500).json({ error: "LINE_CHANNEL_TOKEN 未設定" });
@@ -75,15 +74,18 @@ module.exports = async function handler(req, res) {
       "時間": timeStr,
       "時長": (bk.length || "?"),
       "姓名": bk.name || "未提供",
-      "電話": bk.phone || "未提供"
+      "電話": bk.phone || "未提供",
+      "備註": bk.note || ""
     };
 
     // 內建預設訊息（模板讀不到時的後備）
     const addonLine = bk.addons ? "➕ 加購：" + bk.addons + "\n" : "";
+    const noteLine = bk.note ? "📝 備註：" + bk.note + "\n" : "";
     const defaultOwner =
       "🔔 新預約通知\n\n📋 " + bk.title + "\n" + addonLine +
       "📅 " + timeStr + "\n⏱ " + (bk.length || "?") + " 分鐘\n" +
-      "👤 " + (bk.name || "未提供") + "\n📱 " + (bk.phone || "未提供");
+      "👤 " + (bk.name || "未提供") + "\n📱 " + (bk.phone || "未提供") +
+      (noteLine ? "\n" + noteLine : "");
     const defaultCustomer =
       "✅ 預約確認\n\n感謝您的預約！\n\n📋 " + bk.title + "\n" + addonLine +
       "📅 " + timeStr + "\n⏱ " + (bk.length || "?") + " 分鐘\n\n" +

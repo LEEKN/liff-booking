@@ -107,8 +107,6 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ status: r.status, raw: await r.json() });
       }
 
-      // debugTemplate：檢查通知模板是否讀到、並直接驗證 webhook/reminder 實際用的鍵能不能取到
-      // 用法：/api/cal?action=debugTemplate
       if (action === "debugTemplate") {
         const templates = await loadTemplates(apiKey, calUsername);
         const usedKeys = ["新預約-店主", "預約確認-客人", "提醒-客人"];
@@ -246,19 +244,16 @@ module.exports = async function handler(req, res) {
       if (!body || body.action !== "createBooking")
         return res.status(400).json({ error: "未知 action" });
 
-      // email 可選：顧客未填時，用店家自己的信箱（FALLBACK_EMAIL）當代收信箱
-      // Cal.com 會驗證信箱網域能不能收信，所以不能用 @example.com 這種假網域
       const fallbackEmail = process.env.FALLBACK_EMAIL || "";
       const attendeeEmail = (body.email && String(body.email).trim())
         ? String(body.email).trim()
         : fallbackEmail;
       if (!attendeeEmail) {
         return res.status(400).json({
-          error: "缺少 email：顧客未填 email，且未設定 FALLBACK_EMAIL 環境變數。請設定店家信箱作為代收信箱，或請顧客填寫 email。"
+          error: "缺少 email：顧客未填且未設定 FALLBACK_EMAIL"
         });
       }
 
-      // 最簡 payload，只放 Cal.com 文件明確要求的欄位
       const payload = {
         eventTypeId: Number(body.eventTypeId),
         start: body.startTime,
@@ -276,6 +271,10 @@ module.exports = async function handler(req, res) {
         payload.lengthInMinutes = Number(body.lengthInMinutes);
       }
 
+      // 備註寫進 metadata，供通知訊息使用
+      if (body.note) {
+        payload.metadata.note = String(body.note).slice(0, 500);
+      }
       // 加購資訊寫進 metadata，供通知訊息使用
       if (body.addons) {
         payload.metadata.addons = String(body.addons).slice(0, 500);
