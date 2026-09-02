@@ -189,13 +189,15 @@ function extractBooking(bk) {
   // 服務名稱
   const title = bk.title || bk.eventType?.title || bk.type || "預約";
 
-  // 開始時間
+  // 開始 / 結束時間（相容 startTime/endTime 與 start/end 兩種格式）
   const startTime = bk.startTime || bk.start || "";
+  const endTime = bk.endTime || bk.end || "";
 
-  // 時長（分鐘）
-  let length = bk.length || bk.eventType?.length || 0;
-  if (!length && bk.startTime && bk.endTime) {
-    length = Math.round((new Date(bk.endTime) - new Date(bk.startTime)) / 60000);
+  // 時長（分鐘）：先取明確欄位，取不到再用起訖時間相減
+  let length = bk.length || bk.lengthInMinutes || bk.duration
+    || bk.eventType?.length || bk.eventType?.lengthInMinutes || 0;
+  if (!length && startTime && endTime) {
+    length = Math.round((new Date(endTime) - new Date(startTime)) / 60000);
   }
 
   // 客人姓名

@@ -1450,8 +1450,11 @@ async function submitBooking() {
   var phone = document.getElementById("input-phone").value.trim();
 
   if (!name) { alert("請填寫姓名"); return; }
-  if (!phone) { alert("請填寫手機號碼"); return; }
-  if (email && !email.includes("@")) { alert("Email 格式不正確"); return; }
+
+  var phoneDigits = phone.replace(/[\s\-]/g, "");
+  if (!/^09\d{8}$/.test(phoneDigits)) { alert("請輸入正確的手機號碼（例如 0912345678）"); return; }
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Email 格式不正確，請確認或留空不填"); return; }
 
   var btn = document.getElementById("btn-next");
   btn.classList.add("loading");
@@ -1510,14 +1513,17 @@ async function submitBooking() {
     window.addEventListener("popstate", function() { closeWindow(); });
 
   } catch(err) {
-    console.error("Booking error:", err);
-    // 顯示完整錯誤內容方便除錯
-    var msg = err.message || "未知錯誤";
-    try {
-      var errData = JSON.parse(msg);
-      msg = JSON.stringify(errData, null, 2);
-    } catch(e) {}
-    alert("預約失敗：\n" + msg);
+    console.error("Booking error:", err);   // 完整錯誤保留在 console 供除錯
+    var raw = (err && err.message) ? err.message : "";
+    var friendly = "預約失敗，請確認資料是否正確後再試一次。";
+    if (/mail|email/i.test(raw)) {
+      friendly = "Email 有誤，請確認格式與網域是否正確，或留空不填。";
+    } else if (/phone/i.test(raw)) {
+      friendly = "手機號碼格式有誤，請確認後再試（例如 0912345678）。";
+    } else if (/slot|no_available|already|booked|conflict|not available/i.test(raw)) {
+      friendly = "這個時段可能剛被預約或已不可用，請重新選擇時段。";
+    }
+    alert(friendly);
     btn.classList.remove("loading");
     btn.disabled = false;
   }
