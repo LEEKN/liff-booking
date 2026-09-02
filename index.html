@@ -1460,8 +1460,9 @@ async function submitBooking() {
   btn.disabled = true;
 
   try {
-    // Cal.com API 的 email 為必填，若顧客未填則用手機號碼產生虛擬 email
-    var emailToSend = email || (phone.replace(/[^0-9]/g, "") + "@example.com");
+    // email 顧客可不填；空著時交給後端 cal.js 用 FALLBACK_EMAIL（店家自己的信箱）補上
+    // 不在前端自造假 email：Cal.com 會驗證網域能不能收信，@example.com / @sms.cal.com 都會被擋
+    var emailToSend = email;   // 可能為空字串，由後端處理
 
     // 只有選了加購（總時長 ≠ 原始時長）才送 lengthInMinutes
     // 沒加購的方案若送此欄位，Cal.com 會因「非多時長方案」拒絕

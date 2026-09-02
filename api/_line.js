@@ -37,6 +37,7 @@ async function loadTemplates(calApiKey, calUsername) {
 
     let list = [];
     if (Array.isArray(data.data)) list = data.data;
+    else if (data.data && Array.isArray(data.data.eventTypes)) list = data.data.eventTypes;
     else if (data.data && Array.isArray(data.data.eventTypeGroups))
       list = data.data.eventTypeGroups.flatMap(g => g.eventTypes || []);
 

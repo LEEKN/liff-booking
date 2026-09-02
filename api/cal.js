@@ -4,6 +4,7 @@
  */
 
 const CAL_API_BASE = "https://api.cal.com/v2";
+const { loadTemplates } = require("./_line");
 
 /**
  * 解析 Event Type 的 Description，分離「服務說明」與「加購清單」
@@ -104,6 +105,17 @@ module.exports = async function handler(req, res) {
           { headers: { "Authorization": "Bearer " + token, "cal-api-version": "2024-06-14" } }
         );
         return res.status(200).json({ status: r.status, raw: await r.json() });
+      }
+
+      // debugTemplate：檢查通知模板有沒有被讀到、讀到哪些區塊
+      // 用法：/api/cal?action=debugTemplate
+      if (action === "debugTemplate") {
+        const templates = await loadTemplates(apiKey, calUsername);
+        return res.status(200).json({
+          found: !!templates,
+          blocks: templates ? Object.keys(templates) : [],
+          templates: templates || null
+        });
       }
 
       // 取得方案
@@ -230,6 +242,18 @@ module.exports = async function handler(req, res) {
       if (!body || body.action !== "createBooking")
         return res.status(400).json({ error: "未知 action" });
 
+      // email 可選：顧客未填時，用店家自己的信箱（FALLBACK_EMAIL）當代收信箱
+      // Cal.com 會驗證信箱網域能不能收信，所以不能用 @example.com 這種假網域
+      const fallbackEmail = process.env.FALLBACK_EMAIL || "";
+      const attendeeEmail = (body.email && String(body.email).trim())
+        ? String(body.email).trim()
+        : fallbackEmail;
+      if (!attendeeEmail) {
+        return res.status(400).json({
+          error: "缺少 email：顧客未填 email，且未設定 FALLBACK_EMAIL 環境變數。請設定店家信箱作為代收信箱，或請顧客填寫 email。"
+        });
+      }
+
       // 最簡 payload，只放 Cal.com 文件明確要求的欄位
       const payload = {
         eventTypeId: Number(body.eventTypeId),
@@ -237,7 +261,7 @@ module.exports = async function handler(req, res) {
         metadata: {},
         attendee: {
           name: body.name,
-          email: body.email,
+          email: attendeeEmail,
           timeZone: "Asia/Taipei",
           language: "zh-TW"
         }
