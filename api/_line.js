@@ -98,7 +98,7 @@ function renderTemplate(tpl, vars) {
   let text = tpl;
 
   // 先處理「加購」這種可能為空、要整行移除的變數
-  const lineRemoveIfEmpty = ["加購", "備註", "提醒"];
+  const lineRemoveIfEmpty = ["加購", "備註", "提醒", "信箱"];
   text = text.split("\n").filter(line => {
     for (const key of lineRemoveIfEmpty) {
       if (line.indexOf("{" + key + "}") !== -1) {
@@ -225,7 +225,12 @@ function extractBooking(bk) {
   let note = "";
   if (bk.metadata && bk.metadata.note) note = bk.metadata.note;
 
-  return { title, startTime, length, name, lineUserId, phone, addons, note };
+  // 客人 email
+  let email = "";
+  if (bk.attendees && bk.attendees[0] && bk.attendees[0].email) email = bk.attendees[0].email;
+  else if (bk.responses && bk.responses.email && bk.responses.email.value) email = bk.responses.email.value;
+
+  return { title, startTime, length, name, lineUserId, phone, addons, note, email };
 }
 
 module.exports = { pushLine, toTaiwanTime, extractBooking, loadTemplates, renderTemplate };
