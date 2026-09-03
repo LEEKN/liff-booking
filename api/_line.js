@@ -63,7 +63,7 @@ async function loadTemplates(calApiKey, calUsername) {
 function parseTemplateBlocks(description) {
   // 去 HTML
   const plain = description
-    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<br[^>]*>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/\\\[/g, "[")

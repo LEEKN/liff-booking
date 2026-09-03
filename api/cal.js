@@ -23,7 +23,7 @@ function parseDescription(description) {
 
   // 去除 HTML 標籤與 Markdown 反引號
   const plain = description
-    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<br[^>]*>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/`/g, "");
