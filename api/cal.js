@@ -235,6 +235,14 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(await r.json());
       }
 
+      // 前端啟動時取設定（LIFF_ID 等），避免寫死在 index.html
+      if (action === "config") {
+        return res.status(200).json({
+          liffId: process.env.LIFF_ID || "",
+          storeName: process.env.STORE_NAME || ""
+        });
+      }
+
       return res.status(400).json({ error: "未知 action" });
     }
 

@@ -923,7 +923,7 @@
 /* ======================================================
    ★ 請修改以下設定
    ====================================================== */
-var LIFF_ID    = "2010006924-yy3gmsF5";       // 第 9 節取得的 LIFF ID
+var LIFF_ID    = "";   // 從後端環境變數取得，不再寫死
 var API_BASE   = "";                   // 留空 = 使用相對路徑（部署在同一個 Vercel 專案）
                                        // 若獨立部署，填入 Vercel Function URL，例如 https://xxx.vercel.app
 /* ====================================================== */
@@ -985,6 +985,17 @@ function trackClick(action, itemName, planName) {
 
 /* ── 初始化 ── */
 async function init() {
+  // 從後端取 LIFF_ID（環境變數），避免每個客戶改程式碼
+  if (!LIFF_ID) {
+    try {
+      var cfg = await (await fetch((API_BASE || "") + "/api/cal?action=config")).json();
+      LIFF_ID = cfg.liffId || "";
+    } catch(e) {}
+  }
+  if (!LIFF_ID) {
+    document.getElementById("screen-loading").innerHTML = "<p style='padding:2em;text-align:center'>系統設定中，請稍後再試。</p>";
+    return;
+  }
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) { liff.login(); return; }
   var profile = await liff.getProfile();
